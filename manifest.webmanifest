@@ -1,0 +1,25 @@
+{
+  "name": "萬友咖啡點單",
+  "short_name": "萬友點單",
+  "description": "台中咖啡展現場點單系統（純本機離線版）",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#394253",
+  "theme_color": "#394253",
+  "icons": [
+    {
+      "src": "images/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

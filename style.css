@@ -1,0 +1,510 @@
+/* ===================================================================
+   萬友咖啡 · 台中咖啡展點單系統  樣式表
+   沿用「丟單文字系統」的萬友品牌色票，視覺一致。
+   給設計師的提示：所有顏色、圓角、陰影都集中在下面的 :root 變數，
+   想換色只要改這一區，全站自動更新（像 InDesign 的色票）。
+   =================================================================== */
+
+:root{
+  --accent:#394253;        /* 萬友主色 深藍 */
+  --accent-dark:#2a3140;   /* 深藍按下/hover */
+  --secondary:#ECD9C3;     /* 米色輔色 */
+  --warning:#F4A257;       /* 橘色 強調/低庫存/總額 */
+  --bg:#faf7f2;            /* 淡米背景 */
+  --surface:#ffffff;       /* 卡片白底 */
+  --surface-soft:#fbf8f3;  /* 商品列淡米底 */
+  --border:#e3ddd2;        /* 柔米邊框 */
+  --text:#2d2520;         /* 主文字 深棕 */
+  --text-soft:#6b5f53;     /* 輔助文字 灰棕 */
+  --success:#5a8a4a;       /* 成功 綠 */
+  --danger:#c44a3a;        /* 清空/移除/警示 紅 */
+  --radius:8px;
+  --shadow:0 2px 12px rgba(45,50,65,.08);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.25);
+}
+
+/* ---- 基礎重置 ---- */
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+body{
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft JhengHei", "PingFang TC", "Helvetica Neue", Arial, sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* 標題用襯線字體（同丟單系統的品牌調性） */
+h1,h2,.serif{
+  font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;
+  font-weight:700;
+}
+
+/* ===================================================================
+   頂部標題列
+   =================================================================== */
+.header{
+  background:var(--accent);
+  color:#fff;
+  padding:14px 20px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+.header img.logo{
+  width:42px; height:42px;
+  border-radius:50%;
+  background:#fff;
+  /* logo 是黑色圓標，留 3px 白底當作白邊，在深藍標題上才跳得出來 */
+  padding:3px;
+  object-fit:contain;
+  flex:0 0 auto;
+}
+.header h1{
+  font-size:22px;
+  color:#fff;
+  letter-spacing:1px;
+}
+.header .subtitle{
+  font-size:13px;
+  color:var(--secondary);
+  margin-top:2px;
+}
+
+/* ---- 連線狀態橫幅 ---- */
+.status-bar{
+  font-size:13px;
+  padding:8px 20px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.status-bar .dot{
+  width:9px; height:9px; border-radius:50%;
+  flex:0 0 auto;
+}
+.status-bar.online{ background:rgba(90,138,74,.12); color:var(--success); }
+.status-bar.online .dot{ background:var(--success); }
+.status-bar.offline{ background:rgba(244,162,87,.15); color:#a9682b; }
+.status-bar.offline .dot{ background:var(--warning); }
+/* 純本機模式（綠燈，代表資料安全存在平板） */
+.status-bar.local{ background:rgba(90,138,74,.12); color:var(--success); }
+.status-bar.local .dot{ background:var(--success); }
+
+/* ===================================================================
+   管理工具列（統計 + 匯出/匯入/開新的一天）
+   =================================================================== */
+.toolbar{
+  max-width:1200px;
+  margin:0 auto;
+  padding:10px 20px 0;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.toolbar-stats{
+  font-size:14px;
+  font-weight:600;
+  color:var(--text-soft);
+}
+.toolbar-actions{
+  margin-left:auto;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.btn-sm{
+  font-family:inherit;
+  font-size:13px;
+  font-weight:600;
+  padding:7px 14px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text);
+  cursor:pointer;
+  transition:.15s;
+}
+.btn-sm:hover{ border-color:var(--accent); }
+.btn-sm:active{ transform:scale(.97); }
+.btn-sm.danger-text{ color:var(--danger); }
+.btn-sm.danger-text:hover{ border-color:var(--danger); }
+
+/* ===================================================================
+   主版面：左商品 + 右購物車（平板優先的兩欄）
+   =================================================================== */
+.layout{
+  display:grid;
+  grid-template-columns:1fr 360px;
+  gap:20px;
+  max-width:1200px;
+  margin:0 auto;
+  padding:20px;
+  align-items:start;
+}
+
+/* ---- 分類頁籤 ---- */
+.tabs{
+  display:flex;
+  gap:10px;
+  margin-bottom:16px;
+}
+.tab{
+  font-size:15px;
+  font-weight:600;
+  padding:9px 18px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text-soft);
+  border-radius:999px;
+  cursor:pointer;
+  transition:.15s;
+}
+.tab:hover{ border-color:var(--accent); }
+.tab.active{
+  background:var(--accent);
+  color:#fff;
+  border-color:var(--accent);
+}
+
+/* ---- 商品卡片網格 ---- */
+.products{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));
+  gap:14px;
+}
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  transition:.15s;
+}
+.card .name{
+  font-size:15px;
+  font-weight:600;
+  line-height:1.35;
+  min-height:42px;        /* 讓長短品名的卡片高度一致 */
+}
+.card .price{
+  font-size:18px;
+  font-weight:700;
+  color:var(--accent);
+}
+.card .price small{ font-size:12px; color:var(--text-soft); font-weight:400; }
+
+/* 贈品的「🎁 贈品」字樣（取代價格） */
+.card .price.gift-price{ color:var(--warning); font-size:16px; }
+/* 贈品卡片「已選 N 個」小標 */
+.card .given-badge{
+  font-size:12px; font-weight:600;
+  color:var(--success);
+  background:rgba(90,138,74,.1);
+  border-radius:6px;
+  padding:3px 8px;
+  align-self:flex-start;
+}
+
+/* 庫存標示 */
+.card .stock{ font-size:12px; color:var(--text-soft); }
+.card .stock.low{ color:#a9682b; font-weight:600; }   /* 低庫存橘字 */
+.card .stock.out{ color:var(--danger); font-weight:600; }
+
+/* 售罄的卡片整體灰化 */
+.card.sold-out{ opacity:.55; }
+
+/* 加入按鈕 / 步進器都放在卡片底部 */
+.card .card-action{ margin-top:auto; }
+
+/* ===================================================================
+   按鈕系統（沿用萬友 .primary / .secondary 手感）
+   =================================================================== */
+button{ font-family:inherit; cursor:pointer; }
+
+.btn{
+  border:1px solid transparent;
+  border-radius:6px;
+  padding:9px 14px;
+  font-size:14px;
+  font-weight:600;
+  transition:.15s;
+  width:100%;
+}
+.btn:active{ transform:scale(.98); }    /* 點擊回饋 */
+.btn.primary{ background:var(--accent); color:#fff; }
+.btn.primary:hover{ background:var(--accent-dark); }
+.btn.primary:disabled{
+  background:#c9c3b8; color:#fff; cursor:not-allowed; transform:none;
+}
+.btn.secondary{
+  background:#fff; color:var(--text); border-color:var(--border);
+}
+.btn.secondary:hover{ border-color:var(--accent); }
+.btn.danger{ background:#fff; color:var(--danger); border-color:var(--danger); }
+.btn.danger:hover{ background:var(--danger); color:#fff; }
+
+/* ---- 數量步進器（– 數量 +）---- */
+.stepper{
+  display:flex;
+  align-items:center;
+  border:1px solid var(--border);
+  border-radius:6px;
+  overflow:hidden;
+}
+.stepper button{
+  width:34px; height:36px;
+  border:none;
+  background:var(--surface-soft);
+  color:var(--accent);
+  font-size:18px;
+  font-weight:700;
+  line-height:1;
+}
+.stepper button:hover{ background:var(--secondary); }
+.stepper button:disabled{ color:#c9c3b8; cursor:not-allowed; }
+.stepper .qty{
+  flex:1;
+  text-align:center;
+  font-size:15px;
+  font-weight:700;
+}
+
+/* ===================================================================
+   右側購物車面板
+   =================================================================== */
+.cart{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:18px;
+  position:sticky;
+  top:20px;
+}
+.cart h2{
+  font-size:18px;
+  margin-bottom:12px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+.cart-empty{
+  color:var(--text-soft);
+  font-size:14px;
+  text-align:center;
+  padding:30px 0;
+}
+
+.cart-line{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:6px 10px;
+  align-items:center;
+  padding:10px 0;
+  border-bottom:1px dashed var(--border);
+}
+.cart-line .c-name{ font-size:14px; font-weight:600; }
+.cart-line .c-sub{ font-size:14px; font-weight:700; color:var(--accent); text-align:right; }
+.cart-line .c-sub.gift{ color:var(--warning); font-size:13px; }
+.cart-line .c-note{ font-size:13px; color:var(--text-soft); }
+.cart-line .c-controls{ display:flex; align-items:center; gap:10px; grid-column:1 / -1; }
+.cart-line .stepper{ flex:0 0 auto; }
+
+/* 贈品原因小標籤（公關贈送／滿額贈／扭蛋獎品） */
+.reason-chip{
+  display:inline-block;
+  font-size:11px; font-weight:600;
+  color:#a9682b;
+  background:rgba(244,162,87,.18);
+  border-radius:999px;
+  padding:1px 8px;
+  margin-left:4px;
+  vertical-align:middle;
+}
+.cart-line .c-remove{
+  background:none; border:none; color:var(--danger);
+  font-size:13px; padding:4px;
+}
+.cart-line .c-remove:hover{ text-decoration:underline; }
+
+/* 合計 */
+.cart-total{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin:16px 0;
+  padding-top:14px;
+  border-top:2px solid var(--accent);
+}
+.cart-total .label{ font-size:15px; color:var(--text-soft); }
+.cart-total .amount{
+  font-family:"Noto Serif TC",serif;
+  font-size:30px;
+  font-weight:700;
+  color:var(--accent);
+}
+.cart-actions{ display:flex; gap:10px; }
+.cart-actions .btn{ width:auto; flex:1; }
+
+/* ===================================================================
+   結帳確認彈窗
+   =================================================================== */
+.overlay{
+  position:fixed; inset:0;
+  background:rgba(45,50,65,.5);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:50;
+}
+.overlay.show{ display:flex; }
+.modal{
+  background:var(--surface);
+  border-radius:12px;
+  box-shadow:var(--shadow-lg);
+  width:100%;
+  max-width:420px;
+  padding:24px;
+  max-height:90vh;
+  overflow:auto;
+}
+.modal h2{ font-size:20px; margin-bottom:6px; }
+.modal .modal-sub{ font-size:13px; color:var(--text-soft); margin-bottom:16px; }
+.modal-line{
+  display:flex; justify-content:space-between;
+  padding:9px 0; font-size:15px;
+  border-bottom:1px dashed var(--border);
+}
+.modal-line .m-qty{ color:var(--text-soft); font-size:13px; }
+.modal-line .gift{ color:var(--warning); font-size:13px; font-weight:600; }
+.modal-note{ font-size:13px; color:var(--text-soft); padding:8px 0 0; }
+
+/* 贈品「選擇原因」彈窗 */
+.modal-reason .reason-options{
+  display:flex; flex-direction:column; gap:10px;
+  margin:4px 0 18px;
+}
+.reason-btn{
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--text);
+  font-size:16px;
+  padding:14px;
+  text-align:center;
+}
+.reason-btn:hover{ border-color:var(--warning); background:rgba(244,162,87,.08); }
+
+/* 補貨彈窗 */
+.modal-restock{ max-width:460px; }
+#restockList{ max-height:50vh; overflow:auto; margin-bottom:6px; }
+.restock-row{
+  display:grid;
+  grid-template-columns:1fr auto 80px;
+  gap:10px;
+  align-items:center;
+  padding:9px 0;
+  border-bottom:1px dashed var(--border);
+}
+.restock-row .r-name{ font-size:14px; font-weight:600; }
+.restock-row .r-now{ font-size:13px; color:var(--text-soft); }
+.restock-row .r-add{
+  width:80px;
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-size:15px;
+  text-align:center;
+}
+.restock-row .r-add:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(57,66,83,.15);
+}
+
+.modal-total{
+  display:flex; justify-content:space-between; align-items:baseline;
+  margin:18px 0 22px;
+  padding-top:14px; border-top:2px solid var(--accent);
+}
+.modal-total .amount{
+  font-family:"Noto Serif TC",serif;
+  font-size:34px; font-weight:700; color:var(--accent);
+}
+.modal-actions{ display:flex; gap:10px; }
+.modal-actions .btn{ flex:1; }
+
+/* ===================================================================
+   Toast 成功提示
+   =================================================================== */
+.toast{
+  position:fixed;
+  left:50%; bottom:30px;
+  transform:translateX(-50%) translateY(20px);
+  background:var(--accent);
+  color:#fff;
+  padding:12px 22px;
+  border-radius:999px;
+  font-size:14px;
+  box-shadow:var(--shadow-lg);
+  opacity:0;
+  pointer-events:none;
+  transition:.25s;
+  z-index:60;
+}
+.toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.success{ background:var(--success); }
+.toast.warn{ background:var(--warning); color:#3a2a12; }
+
+/* ===================================================================
+   響應式：手機 / 直立平板 → 購物車收到底部
+   =================================================================== */
+@media (max-width:780px){
+  .layout{
+    grid-template-columns:1fr;
+    padding:14px;
+    /* 底部留白給固定的購物車橫條 */
+    padding-bottom:96px;
+  }
+  .cart{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    top:auto;
+    border-radius:14px 14px 0 0;
+    border-bottom:none;
+    box-shadow:0 -4px 20px rgba(45,50,65,.15);
+    max-height:70vh;
+    overflow:auto;
+    /* 預設收合成一條，點「展開」才看明細 */
+  }
+  /* 收合時「只藏商品明細」，合計與〔清空〕〔結帳〕按鈕一直保留在底部橫條 */
+  .cart.collapsed #cartLines{ display:none; }
+  .cart.collapsed .cart-total{ margin:10px 0; }
+  .cart-toggle{
+    display:block;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    font-size:13px; font-weight:600;
+    padding:7px 14px;
+    border-radius:999px;
+    margin-left:auto;
+    flex:0 0 auto;
+  }
+  .cart h2{ display:flex; align-items:center; gap:8px; }
+}
+
+/* 桌機不顯示「展開/收合」鈕與迷你總額 */
+.cart-toggle{ display:none; }
+.cart-mini{
+  display:none;
+  font-family:"Noto Serif TC",serif;
+  font-weight:700;
+  font-size:17px;
+  color:var(--accent);
+}

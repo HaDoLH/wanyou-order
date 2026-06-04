@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport：讓平板/手機正確縮放，現場操作必備 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>萬友咖啡 · 台中咖啡展點單</title>
+
+  <!-- PWA：讓平板能「加到主畫面」、離線開啟 -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#394253" />
+  <link rel="apple-touch-icon" href="images/icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="萬友點單" />
+
+  <!-- Noto Serif TC 襯線標題字（有網路時用；離線自動回退系統襯線） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet" />
+
+  <!-- 樣式表。改 CSS 後把 ?v= 數字加一，強迫瀏覽器抓新版（破快取） -->
+  <link rel="stylesheet" href="style.css?v=6" />
+</head>
+<body>
+
+  <!-- ============ 頂部標題列 ============ -->
+  <header class="header">
+    <!-- 萬友 WY 圓形 logo（用無空格檔名 icon.png，避免上線後中文檔名出狀況） -->
+    <img class="logo" src="images/icon.png" alt="萬友咖啡 logo" onerror="this.style.display='none'" />
+    <div>
+      <h1>萬友咖啡 · 台中咖啡展</h1>
+      <div class="subtitle">現場點單系統</div>
+    </div>
+  </header>
+
+  <!-- 狀態列：純本機模式（資料存在這台平板，免網路） -->
+  <div id="statusBar" class="status-bar local">
+    <span class="dot"></span>
+    <span id="statusText">本機模式：資料存在這台平板（免網路）</span>
+  </div>
+
+  <!-- ============ 管理工具列 ============ -->
+  <div class="toolbar">
+    <div class="toolbar-stats" id="toolbarStats">訂單 0 筆 · 營收 $0</div>
+    <div class="toolbar-actions">
+      <button class="btn-sm" id="restockBtn">補貨</button>
+      <button class="btn-sm" id="importBtn">匯入商品</button>
+      <button class="btn-sm" id="exportBtn">匯出 CSV</button>
+      <button class="btn-sm danger-text" id="newDayBtn">開新的一天</button>
+      <!-- 匯入商品用的隱藏檔案選擇器 -->
+      <input type="file" id="importFile" accept=".csv,text/csv" hidden />
+    </div>
+  </div>
+
+  <!-- ============ 主版面：左商品 + 右購物車 ============ -->
+  <div class="layout">
+
+    <!-- 左側：分類頁籤 + 商品卡片 -->
+    <main>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-cat="beans">生豆</button>
+        <button class="tab" data-cat="gift">贈品</button>
+      </div>
+      <div class="products" id="products">
+        <!-- 商品卡片由 JS 動態產生 -->
+      </div>
+    </main>
+
+    <!-- 右側：購物車面板 -->
+    <aside class="cart collapsed" id="cart">
+      <h2>
+        本筆訂單
+        <!-- 手機版收合時，這裡顯示「件數＋總額」迷你摘要 -->
+        <span class="cart-mini" id="cartMini">0 件　$0</span>
+        <!-- 手機版才會出現的展開/收合鈕 -->
+        <button class="cart-toggle" id="cartToggle">展開明細</button>
+      </h2>
+      <div class="cart-body" id="cartBody">
+        <div id="cartLines">
+          <div class="cart-empty">尚未選擇商品<br>點左側「＋」開始點單</div>
+        </div>
+        <div class="cart-total">
+          <span class="label">合計</span>
+          <span class="amount" id="cartTotal">$0</span>
+        </div>
+        <div class="cart-actions">
+          <button class="btn danger" id="clearBtn">清空</button>
+          <button class="btn primary" id="checkoutBtn">結帳確認</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ 結帳確認彈窗 ============ -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2>結帳確認</h2>
+      <div class="modal-sub">請與客人確認以下品項與金額</div>
+      <div id="modalLines"><!-- 明細由 JS 產生 --></div>
+      <div class="modal-total">
+        <span class="label">應收總額</span>
+        <span class="amount" id="modalTotal">$0</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="modalCancel">返回修改</button>
+        <button class="btn primary" id="modalConfirm">完成並送出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 贈品「發放原因」選擇彈窗 ============ -->
+  <div class="overlay" id="reasonOverlay">
+    <div class="modal modal-reason">
+      <h2>選擇贈送原因</h2>
+      <div class="modal-sub" id="reasonProductName">—</div>
+      <div class="reason-options" id="reasonOptions">
+        <button class="btn reason-btn" data-reason="公關贈送">公關贈送</button>
+        <button class="btn reason-btn" data-reason="滿額贈">滿額贈</button>
+        <button class="btn reason-btn" data-reason="扭蛋獎品">扭蛋獎品</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="reasonCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 補貨彈窗 ============ -->
+  <div class="overlay" id="restockOverlay">
+    <div class="modal modal-restock">
+      <h2>補貨</h2>
+      <div class="modal-sub">輸入每項要「增加」的數量（不填或 0 表示不變）</div>
+      <div id="restockList"><!-- 清單由 JS 產生 --></div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="restockCancel">取消</button>
+        <button class="btn primary" id="restockConfirm">確認補貨</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ===================================================================
+       JavaScript：純本機點單系統（資料存 localStorage，免網路）
+       全部寫在這裡，沒有外部套件，看得懂每一行。
+       =================================================================== -->
+  <script>
+  /* ============================================================
+     ① 設定區（你之後主要會動的地方）
+     ============================================================ */
+
+  // 贈送原因（贈品用，要加減原因改這裡）
+  const GIFT_REASONS = ['公關贈送', '滿額贈', '扭蛋獎品'];
+
+  // 第一次啟動用的「種子商品」。之後商品以平板裡的存檔（localStorage）為準，
+  // 要換商品有兩個方法：①改這份種子後按「開新的一天」重置 ②用「匯入商品」讀 CSV。
+  //   cat:'beans' = 生豆（販售）；cat:'gift' = 贈品（價格 0、用「發放」記錄）
+  const DEFAULT_PRODUCTS = [
+    { id:'b1', cat:'beans', name:'衣索比亞 耶加雪菲 G1', price:450, unit:'包', stock:30, lowAt:5 },
+    { id:'b2', cat:'beans', name:'瓜地馬拉 安提瓜',     price:480, unit:'包', stock:24, lowAt:5 },
+    { id:'b3', cat:'beans', name:'肯亞 AA TOP',          price:520, unit:'包', stock:4,  lowAt:5 },
+    { id:'b4', cat:'beans', name:'哥倫比亞 水洗',         price:420, unit:'包', stock:0,  lowAt:5 },
+    { id:'b5', cat:'beans', name:'巴西 喜拉朵 黃波旁',    price:400, unit:'包', stock:18, lowAt:5 },
+    { id:'g1', cat:'gift',  name:'壓克力杯墊',           price:0,   unit:'個', stock:10, lowAt:8 },
+    { id:'g2', cat:'gift',  name:'萬友馬克杯',            price:0,   unit:'個', stock:12, lowAt:5 },
+    { id:'g3', cat:'gift',  name:'帆布咖啡袋',            price:0,   unit:'個', stock:6,  lowAt:5 },
+  ];
+
+  // localStorage 的鍵名（資料就存在這兩個「抽屜」裡）
+  const KEY_PRODUCTS = 'wy_products';   // 商品＋庫存總量
+  const KEY_SALES    = 'wy_sales';      // 銷售紀錄（每行一筆）
+
+  /* ============================================================
+     ② 程式狀態（資料）—— 改資料 → 存檔 → 重畫畫面
+     ============================================================ */
+  let products = [];        // 目前所有商品（含 remaining 即時剩餘）
+  let sales = [];           // 本機銷售紀錄陣列
+  // 購物車：key = 「行」的唯一鍵，value = { id, qty, reason }
+  //   生豆：key = id，          reason = '銷售'
+  //   贈品：key = id + '|' + 原因，reason = 公關贈送 / 滿額贈 / 扭蛋獎品
+  let cart = {};
+  let currentCat = 'beans';
+  let pendingGiftId = null; // 暫存：正在選原因的贈品 id
+
+  const $ = (sel) => document.querySelector(sel);
+  const productsEl = $('#products');
+  const cartLinesEl = $('#cartLines');
+  const cartTotalEl = $('#cartTotal');
+
+  /* ============================================================
+     ③ 本機存取（localStorage）—— 像平板裡的小抽屜
+     ============================================================ */
+  function loadProducts(){
+    const saved = localStorage.getItem(KEY_PRODUCTS);
+    if(saved){
+      products = JSON.parse(saved);
+    }else{
+      // 第一次啟動：用種子商品，並存進抽屜
+      products = DEFAULT_PRODUCTS.map(p => ({ ...p }));
+      saveProducts();
+    }
+  }
+  function saveProducts(){ localStorage.setItem(KEY_PRODUCTS, JSON.stringify(products)); }
+
+  function loadSales(){
+    const saved = localStorage.getItem(KEY_SALES);
+    sales = saved ? JSON.parse(saved) : [];
+  }
+  function saveSales(){ localStorage.setItem(KEY_SALES, JSON.stringify(sales)); }
+
+  // 即時剩餘 = 庫存總量 − 該商品在銷售紀錄的數量加總（與舊雲端同邏輯，改在本機算）
+  function recomputeRemaining(){
+    const soldById = {};
+    sales.forEach(s => { soldById[s.id] = (soldById[s.id] || 0) + Number(s.qty); });
+    products.forEach(p => { p.remaining = Math.max(0, Number(p.stock) - (soldById[p.id] || 0)); });
+  }
+
+  /* ============================================================
+     ④ 啟動
+     ============================================================ */
+  function init(){
+    loadProducts();
+    loadSales();
+    recomputeRemaining();
+    bindEvents();
+    refresh();
+    updateStats();
+    registerServiceWorker();
+  }
+
+  /* ============================================================
+     ⑤ 庫存判斷小工具
+     ============================================================ */
+  function isGift(p){ return p.cat === 'gift'; }
+
+  // 某商品目前在購物車的總數（贈品可能分散在多個原因行，要全部加起來）
+  function qtyInCartById(id){
+    return Object.values(cart).reduce((s, l) => s + (l.id === id ? l.qty : 0), 0);
+  }
+  // 還能再加幾個 = 剩餘 − 已在購物車的數量
+  function availableStock(p){
+    if(p.remaining === undefined || p.remaining === null) return Infinity;
+    return p.remaining - qtyInCartById(p.id);
+  }
+  function isLow(p){
+    if(p.remaining === undefined || p.remaining === null) return false;
+    return p.remaining > 0 && p.remaining <= (p.lowAt ?? 5);
+  }
+
+  /* ============================================================
+     ⑥ 畫面：商品卡片
+     ============================================================ */
+  function renderProducts(){
+    const list = products.filter(p => p.cat === currentCat);
+    productsEl.innerHTML = '';
+
+    if(list.length === 0){
+      productsEl.innerHTML = '<div class="cart-empty">此分類暫無商品</div>';
+      return;
+    }
+
+    list.forEach(p => {
+      const out = availableStock(p) <= 0;
+      const inCart = qtyInCartById(p.id);
+
+      let stockHtml = '';
+      if(p.remaining !== undefined && p.remaining !== null){
+        const unit = p.unit || (isGift(p) ? '個' : '');
+        if(p.remaining <= 0)   stockHtml = `<div class="stock out">${isGift(p)?'已送完':'已售罄'}</div>`;
+        else if(isLow(p))      stockHtml = `<div class="stock low">⚠ 剩 ${p.remaining} ${unit}</div>`;
+        else                   stockHtml = `<div class="stock">剩 ${p.remaining} ${unit}</div>`;
+      }
+
+      let priceHtml, actionHtml;
+
+      if(isGift(p)){
+        priceHtml = `<div class="price gift-price">🎁 贈品</div>`;
+        const badge = inCart > 0 ? `<div class="given-badge">已選 ${inCart} 個</div>` : '';
+        actionHtml = badge + `<button class="btn primary" data-give="${p.id}" ${out?'disabled':''}>
+                                ${out ? '已送完' : '＋ 發放'}
+                              </button>`;
+      }else{
+        priceHtml = `<div class="price">$${p.price} <small>/ ${p.unit||'件'}</small></div>`;
+        if(inCart === 0){
+          actionHtml = `<button class="btn primary" data-add="${p.id}" ${out?'disabled':''}>
+                          ${out ? '售罄' : '＋ 加入'}
+                        </button>`;
+        }else{
+          const plusDisabled = out ? 'disabled' : '';
+          actionHtml = `<div class="stepper">
+                          <button data-dec="${p.id}">－</button>
+                          <span class="qty">${inCart}</span>
+                          <button data-inc="${p.id}" ${plusDisabled}>＋</button>
+                        </div>`;
+        }
+      }
+
+      const card = document.createElement('div');
+      card.className = 'card' + (out && inCart === 0 ? ' sold-out' : '');
+      card.innerHTML = `
+        <div class="name">${p.name}</div>
+        ${priceHtml}
+        ${stockHtml}
+        <div class="card-action">${actionHtml}</div>
+      `;
+      productsEl.appendChild(card);
+    });
+  }
+
+  /* ============================================================
+     ⑦ 畫面：右側購物車
+     ============================================================ */
+  function renderCart(){
+    const keys = Object.keys(cart);
+    const miniEl = $('#cartMini');
+
+    if(keys.length === 0){
+      cartLinesEl.innerHTML = '<div class="cart-empty">尚未選擇商品<br>點左側「＋」開始點單</div>';
+      cartTotalEl.textContent = '$0';
+      miniEl.textContent = '0 件　$0';
+      return;
+    }
+
+    let total = 0, count = 0;
+    cartLinesEl.innerHTML = '';
+
+    Object.entries(cart).forEach(([key, line]) => {
+      const p = products.find(x => x.id === line.id);
+      if(!p) return;
+      const sub = p.price * line.qty;
+      total += sub;
+      count += line.qty;
+      const plusDisabled = availableStock(p) <= 0 ? 'disabled' : '';
+
+      const nameHtml = isGift(p)
+        ? `<span class="c-name">${p.name} <span class="reason-chip">${line.reason}</span></span>
+           <span class="c-sub gift">贈品</span>`
+        : `<span class="c-name">${p.name}</span>
+           <span class="c-sub">$${sub}</span>`;
+      const unitNote = isGift(p)
+        ? `<span class="c-note">× ${line.qty}</span>`
+        : `<span class="c-note">$${p.price} × ${line.qty}</span>`;
+
+      const lineEl = document.createElement('div');
+      lineEl.className = 'cart-line';
+      lineEl.innerHTML = `
+        ${nameHtml}
+        <div class="c-controls">
+          <div class="stepper">
+            <button data-dec="${key}">－</button>
+            <span class="qty">${line.qty}</span>
+            <button data-inc="${key}" ${plusDisabled}>＋</button>
+          </div>
+          ${unitNote}
+          <button class="c-remove" data-remove="${key}">移除</button>
+        </div>
+      `;
+      cartLinesEl.appendChild(lineEl);
+    });
+
+    cartTotalEl.textContent = '$' + total.toLocaleString();
+    miniEl.textContent = count + ' 件　$' + total.toLocaleString();
+  }
+
+  function cartTotalAmount(){
+    return Object.values(cart).reduce((sum, line) => {
+      const p = products.find(x => x.id === line.id);
+      return sum + (p ? p.price * line.qty : 0);
+    }, 0);
+  }
+
+  /* ============================================================
+     ⑧ 動作：加入生豆 / 發放贈品 / 加減 / 移除 / 清空
+     ============================================================ */
+  function addBean(id){
+    const p = products.find(x => x.id === id);
+    if(!p || availableStock(p) <= 0) return;
+    if(cart[id]) cart[id].qty++;
+    else cart[id] = { id, qty:1, reason:'銷售' };
+    refresh();
+  }
+  function addGift(id, reason){
+    const p = products.find(x => x.id === id);
+    if(!p || availableStock(p) <= 0) return;
+    const key = id + '|' + reason;
+    if(cart[key]) cart[key].qty++;
+    else cart[key] = { id, qty:1, reason };
+    refresh();
+  }
+  function changeQty(key, delta){
+    const line = cart[key];
+    if(!line) return;
+    const p = products.find(x => x.id === line.id);
+    if(delta > 0 && availableStock(p) <= 0) return;
+    line.qty += delta;
+    if(line.qty <= 0) delete cart[key];
+    refresh();
+  }
+  function removeLine(key){ delete cart[key]; refresh(); }
+
+  function clearCart(){
+    if(Object.keys(cart).length === 0) return;
+    if(confirm('確定要清空這筆訂單嗎？')){
+      cart = {};
+      refresh();
+    }
+  }
+
+  function refresh(){ renderProducts(); renderCart(); }
+
+  /* ============================================================
+     ⑨ 贈品「發放原因」選擇彈窗
+     ============================================================ */
+  function openReason(id){
+    const p = products.find(x => x.id === id);
+    if(!p || availableStock(p) <= 0) return;
+    pendingGiftId = id;
+    $('#reasonProductName').textContent = '發放：' + p.name;
+    $('#reasonOverlay').classList.add('show');
+  }
+  function closeReason(){
+    $('#reasonOverlay').classList.remove('show');
+    pendingGiftId = null;
+  }
+  function chooseReason(reason){
+    if(pendingGiftId) addGift(pendingGiftId, reason);
+    closeReason();
+  }
+
+  /* ============================================================
+     ⑩ 結帳：彈窗確認 → 記到本機
+     ============================================================ */
+  function openCheckout(){
+    if(Object.keys(cart).length === 0){
+      showToast('購物車是空的', 'warn');
+      return;
+    }
+    const linesEl = $('#modalLines');
+    linesEl.innerHTML = '';
+    let giftCount = 0;
+
+    Object.values(cart).forEach(line => {
+      const p = products.find(x => x.id === line.id);
+      const row = document.createElement('div');
+      row.className = 'modal-line';
+      if(isGift(p)){
+        giftCount += line.qty;
+        row.innerHTML = `
+          <span>${p.name} <span class="reason-chip">${line.reason}</span> <span class="m-qty">× ${line.qty}</span></span>
+          <span class="gift">贈品</span>`;
+      }else{
+        const sub = p.price * line.qty;
+        row.innerHTML = `
+          <span>${p.name} <span class="m-qty">$${p.price} × ${line.qty}</span></span>
+          <span>$${sub}</span>`;
+      }
+      linesEl.appendChild(row);
+    });
+
+    if(giftCount > 0){
+      const note = document.createElement('div');
+      note.className = 'modal-note';
+      note.textContent = `（含贈品 ${giftCount} 件，不計入金額）`;
+      linesEl.appendChild(note);
+    }
+
+    $('#modalTotal').textContent = '$' + cartTotalAmount().toLocaleString();
+    $('#overlay').classList.add('show');
+  }
+  function closeCheckout(){ $('#overlay').classList.remove('show'); }
+
+  // 送出 = 把每行寫進本機銷售紀錄（不連網）
+  function submitOrder(){
+    const now = new Date();
+    const orderNo = formatOrderNo(now);
+    Object.values(cart).forEach(line => {
+      const p = products.find(x => x.id === line.id);
+      sales.push({
+        time: now.toLocaleString('zh-TW', { hour12:false }),
+        orderNo,
+        id: line.id,
+        name: p.name,
+        qty: line.qty,
+        price: p.price,
+        subtotal: p.price * line.qty,
+        category: line.reason
+      });
+    });
+    saveSales();
+    recomputeRemaining();
+    cart = {};
+    closeCheckout();
+    refresh();
+    updateStats();
+    showToast('已記錄（存在本機）', 'success');
+  }
+
+  /* ============================================================
+     ⑪ 管理工具：匯出 CSV / 匯入商品 / 開新的一天 / 統計
+     ============================================================ */
+  // 訂單編號：用日期時間，方便人看（例 20260604-143015）
+  function formatOrderNo(d){
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  }
+  function todayStamp(){
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}`;
+  }
+
+  // CSV 單格：含逗號/引號/換行就用雙引號包起來
+  function csvCell(v){
+    const s = String(v ?? '');
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function exportCSV(){
+    if(sales.length === 0){ showToast('目前沒有銷售紀錄可匯出', 'warn'); return; }
+    const header = ['時間','訂單編號','品項id','品名','數量','單價','小計','類別'];
+    const rows = sales.map(s => [s.time, s.orderNo, s.id, s.name, s.qty, s.price, s.subtotal, s.category]);
+    const csv = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
+    // 前面加 BOM(﻿)，Excel 開中文才不會亂碼
+    const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `萬友銷售_${todayStamp()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('已匯出 CSV', 'success');
+  }
+
+  // 匯入商品 CSV（格式同 試算表匯入/商品.csv）：id,cat,品名,單價,單位,庫存總量,低庫存門檻
+  function importProductsCSV(file){
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const text = String(e.target.result).replace(/^﻿/, ''); // 去掉 BOM
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+        const next = [];
+        // 第一列是標題，從第二列開始讀
+        for(let i = 1; i < lines.length; i++){
+          const c = lines[i].split(',');
+          if(!c[0]) continue;
+          next.push({
+            id: c[0].trim(),
+            cat: (c[1]||'beans').trim(),
+            name: (c[2]||'').trim(),
+            price: Number(c[3]) || 0,
+            unit: (c[4]||'').trim() || (((c[1]||'').trim()==='gift') ? '個' : '件'),
+            stock: Number(c[5]) || 0,
+            lowAt: Number(c[6]) || 5
+          });
+        }
+        if(next.length === 0){ showToast('CSV 沒有讀到商品，請檢查格式', 'warn'); return; }
+        products = next;
+        saveProducts();
+        recomputeRemaining();
+        refresh();
+        showToast(`已匯入 ${next.length} 項商品`, 'success');
+      }catch(err){
+        console.error(err);
+        showToast('匯入失敗，請確認是商品 CSV', 'warn');
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function newDay(){
+    if(!confirm('開新的一天？\n• 會先把今天的訂單自動匯出成 CSV 備份\n• 庫存「沿用」目前剩餘（不會回滿）\n• 清空今日訂單，筆數/營收歸零')){
+      return;
+    }
+    // ① 先自動備份今天（有資料才匯出）
+    if(sales.length > 0) exportCSV();
+
+    // ② 庫存沿用：把「目前剩餘」設為新的一天庫存起點
+    recomputeRemaining();
+    products.forEach(p => { p.stock = p.remaining; });
+    saveProducts();
+
+    // ③ 清空今日紀錄（此時 remaining = 新 stock = 昨日剩餘）
+    sales = [];
+    saveSales();
+    recomputeRemaining();
+
+    cart = {};
+    refresh();
+    updateStats();
+    showToast('已開新的一天（庫存已沿用）', 'success');
+  }
+
+  // 補貨：列出所有商品，輸入要「增加」的數量
+  function openRestock(){
+    const listEl = $('#restockList');
+    listEl.innerHTML = '';
+    products.forEach(p => {
+      const unit = p.unit || (isGift(p) ? '個' : '件');
+      const row = document.createElement('div');
+      row.className = 'restock-row';
+      row.innerHTML = `
+        <span class="r-name">${p.name}</span>
+        <span class="r-now">剩 ${p.remaining ?? 0} ${unit}</span>
+        <input type="number" class="r-add" data-id="${p.id}" min="0" inputmode="numeric" placeholder="+0" />
+      `;
+      listEl.appendChild(row);
+    });
+    $('#restockOverlay').classList.add('show');
+  }
+  function closeRestock(){ $('#restockOverlay').classList.remove('show'); }
+
+  function confirmRestock(){
+    let changed = 0;
+    document.querySelectorAll('#restockList .r-add').forEach(input => {
+      const n = Math.floor(Number(input.value));
+      if(n > 0){
+        const p = products.find(x => x.id === input.dataset.id);
+        if(p){ p.stock = Number(p.stock) + n; changed++; }
+      }
+    });
+    if(changed === 0){ showToast('沒有輸入要補的數量', 'warn'); return; }
+    saveProducts();
+    recomputeRemaining();
+    refresh();
+    updateStats();
+    closeRestock();
+    showToast(`已補貨 ${changed} 項`, 'success');
+  }
+
+  // 工具列統計：訂單筆數（不同訂單編號）＋ 贈品件數 ＋ 營收（小計加總）
+  function updateStats(){
+    const orderNos = new Set(sales.map(s => s.orderNo));
+    // 贈品件數 = 類別不是「銷售」的數量加總（生豆固定為「銷售」，贈品為原因）
+    const giftQty = sales.reduce((sum, s) => sum + (s.category !== '銷售' ? Number(s.qty) : 0), 0);
+    const revenue = sales.reduce((sum, s) => sum + Number(s.subtotal), 0);
+    $('#toolbarStats').textContent =
+      `訂單 ${orderNos.size} 筆 · 贈品 ${giftQty} 件 · 營收 $${revenue.toLocaleString()}`;
+  }
+
+  /* ============================================================
+     ⑫ 小工具：Toast、事件綁定、PWA 註冊
+     ============================================================ */
+  let toastTimer;
+  function showToast(msg, type){
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (type || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  function bindEvents(){
+    // 分類頁籤
+    $('#tabs').addEventListener('click', e => {
+      const btn = e.target.closest('.tab');
+      if(!btn) return;
+      currentCat = btn.dataset.cat;
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
+      renderProducts();
+    });
+
+    // 商品區（加入生豆 / 發放贈品 / 加 / 減）
+    productsEl.addEventListener('click', e => {
+      const t = e.target;
+      if(t.dataset.add) addBean(t.dataset.add);
+      else if(t.dataset.give) openReason(t.dataset.give);
+      else if(t.dataset.inc) changeQty(t.dataset.inc, 1);
+      else if(t.dataset.dec) changeQty(t.dataset.dec, -1);
+    });
+
+    // 購物車區（加 / 減 / 移除）——這裡的鍵是 lineKey
+    cartLinesEl.addEventListener('click', e => {
+      const t = e.target;
+      if(t.dataset.inc) changeQty(t.dataset.inc, 1);
+      else if(t.dataset.dec) changeQty(t.dataset.dec, -1);
+      else if(t.dataset.remove) removeLine(t.dataset.remove);
+    });
+
+    // 清空 / 結帳
+    $('#clearBtn').addEventListener('click', clearCart);
+    $('#checkoutBtn').addEventListener('click', openCheckout);
+
+    // 結帳彈窗
+    $('#modalCancel').addEventListener('click', closeCheckout);
+    $('#modalConfirm').addEventListener('click', submitOrder);
+    $('#overlay').addEventListener('click', e => {
+      if(e.target.id === 'overlay') closeCheckout();
+    });
+
+    // 贈品原因彈窗
+    $('#reasonOptions').addEventListener('click', e => {
+      const btn = e.target.closest('[data-reason]');
+      if(btn) chooseReason(btn.dataset.reason);
+    });
+    $('#reasonCancel').addEventListener('click', closeReason);
+    $('#reasonOverlay').addEventListener('click', e => {
+      if(e.target.id === 'reasonOverlay') closeReason();
+    });
+
+    // 管理工具列
+    $('#exportBtn').addEventListener('click', exportCSV);
+    $('#newDayBtn').addEventListener('click', newDay);
+    $('#importBtn').addEventListener('click', () => $('#importFile').click());
+    $('#importFile').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if(file) importProductsCSV(file);
+      e.target.value = '';   // 清掉，才能再次選同一個檔
+    });
+
+    // 補貨彈窗
+    $('#restockBtn').addEventListener('click', openRestock);
+    $('#restockCancel').addEventListener('click', closeRestock);
+    $('#restockConfirm').addEventListener('click', confirmRestock);
+    $('#restockOverlay').addEventListener('click', e => {
+      if(e.target.id === 'restockOverlay') closeRestock();
+    });
+
+    // 手機版購物車展開/收合
+    $('#cartToggle').addEventListener('click', () => {
+      const cartEl = $('#cart');
+      cartEl.classList.toggle('collapsed');
+      $('#cartToggle').textContent = cartEl.classList.contains('collapsed') ? '展開明細' : '收合';
+    });
+  }
+
+  // 註冊 service worker（PWA 離線快取）。file:// 開啟時會略過，不影響功能。
+  function registerServiceWorker(){
+    if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+      navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW 註冊失敗：', err));
+    }
+  }
+
+  // 出發！
+  init();
+  </script>
+</body>
+</html>
