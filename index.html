@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet" />
 
   <!-- 樣式表。改 CSS 後把 ?v= 數字加一，強迫瀏覽器抓新版（破快取） -->
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
 
@@ -102,6 +102,41 @@
         <span class="label">應收總額</span>
         <span class="amount" id="modalTotal">$0</span>
       </div>
+
+      <!-- ===== POS 區：只有「應收 > 0」時才顯示（純贈品訂單會隱藏） ===== -->
+      <div id="posBox">
+        <!-- 付款方式 -->
+        <div class="pos-row">
+          <span class="pos-label">付款方式</span>
+          <div class="pay-toggle" id="payToggle">
+            <button class="pay-btn active" data-pay="付現">付現</button>
+            <button class="pay-btn" data-pay="刷卡">刷卡</button>
+          </div>
+        </div>
+
+        <!-- 找零計算（選付現時才顯示） -->
+        <div class="change-row" id="changeRow">
+          <label class="pos-label" for="cashGiven">收現</label>
+          <input type="number" id="cashGiven" inputmode="numeric" min="0" placeholder="客人給的金額" />
+          <span class="change-out" id="changeDue">找零 $0</span>
+        </div>
+
+        <!-- 發票 -->
+        <div class="pos-row">
+          <label class="invoice-toggle"><input type="checkbox" id="invoiceOn" /> 開發票</label>
+        </div>
+        <div class="invoice-box" id="invoiceBox" hidden>
+          <div class="inv-field">
+            <label for="invPrefix">前段（固定）</label>
+            <input type="text" id="invPrefix" placeholder="例 AB-" />
+          </div>
+          <div class="inv-field">
+            <label for="invNo">後段（號碼）</label>
+            <input type="text" id="invNo" inputmode="numeric" placeholder="00000001" />
+          </div>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button class="btn secondary" id="modalCancel">返回修改</button>
         <button class="btn primary" id="modalConfirm">完成並送出</button>
@@ -167,9 +202,11 @@
     { id:'g3', cat:'gift',  name:'帆布咖啡袋',            price:0,   unit:'個', stock:6,  lowAt:5 },
   ];
 
-  // localStorage 的鍵名（資料就存在這兩個「抽屜」裡）
-  const KEY_PRODUCTS = 'wy_products';   // 商品＋庫存總量
-  const KEY_SALES    = 'wy_sales';      // 銷售紀錄（每行一筆）
+  // localStorage 的鍵名（資料就存在這幾個「抽屜」裡）
+  const KEY_PRODUCTS = 'wy_products';        // 商品＋庫存總量
+  const KEY_SALES    = 'wy_sales';           // 銷售紀錄（每行一筆）
+  const KEY_INV_PREFIX = 'wy_invoice_prefix';// 發票前段（記住上次）
+  const KEY_INV_NO     = 'wy_invoice_no';    // 發票下一個後段號碼（含前導 0）
 
   /* ============================================================
      ② 程式狀態（資料）—— 改資料 → 存檔 → 重畫畫面
@@ -181,7 +218,8 @@
   //   贈品：key = id + '|' + 原因，reason = 公關贈送 / 滿額贈 / 扭蛋獎品
   let cart = {};
   let currentCat = 'beans';
-  let pendingGiftId = null; // 暫存：正在選原因的贈品 id
+  let pendingGiftId = null;       // 暫存：正在選原因的贈品 id
+  let selectedPayment = '付現';   // 結帳時選的付款方式（付現/刷卡）
 
   const $ = (sel) => document.querySelector(sel);
   const productsEl = $('#products');
@@ -465,17 +503,74 @@
       linesEl.appendChild(note);
     }
 
-    $('#modalTotal').textContent = '$' + cartTotalAmount().toLocaleString();
+    const total = cartTotalAmount();
+    $('#modalTotal').textContent = '$' + total.toLocaleString();
+    setupPosBox(total);
     $('#overlay').classList.add('show');
   }
   function closeCheckout(){ $('#overlay').classList.remove('show'); }
+
+  // 依應收金額準備 POS 區（付款方式/找零/發票）
+  function setupPosBox(total){
+    const posBox = $('#posBox');
+    posBox.hidden = (total <= 0);   // 純贈品（$0）訂單：整個 POS 區隱藏
+    if(total <= 0) return;
+
+    // 付款方式預設「付現」，顯示找零區
+    selectedPayment = '付現';
+    document.querySelectorAll('#payToggle .pay-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.pay === '付現'));
+    $('#changeRow').hidden = false;
+
+    // 找零：清空收現、顯示找零 $0
+    $('#cashGiven').value = '';
+    updateChange();
+
+    // 發票：預設不開；帶入記住的前段與下一個號碼
+    $('#invoiceOn').checked = false;
+    $('#invoiceBox').hidden = true;
+    $('#invPrefix').value = localStorage.getItem(KEY_INV_PREFIX) || '';
+    $('#invNo').value = localStorage.getItem(KEY_INV_NO) || '';
+  }
+
+  // 找零 = 收現 − 應收
+  function updateChange(){
+    const total = cartTotalAmount();
+    const out = $('#changeDue');
+    if(!$('#cashGiven').value){ out.textContent = '找零 $0'; out.classList.remove('short'); return; }
+    const diff = Number($('#cashGiven').value) - total;
+    if(diff < 0){ out.textContent = '不足 $' + Math.abs(diff).toLocaleString(); out.classList.add('short'); }
+    else        { out.textContent = '找零 $' + diff.toLocaleString();        out.classList.remove('short'); }
+  }
+
+  // 號碼字串 +1，保留前導 0（非數字則原樣返回）
+  function incNumStr(s){
+    if(!s || isNaN(parseInt(s, 10))) return s;
+    return String(parseInt(s, 10) + 1).padStart(s.length, '0');
+  }
 
   // 送出 = 把每行寫進本機銷售紀錄（不連網）
   function submitOrder(){
     const now = new Date();
     const orderNo = formatOrderNo(now);
+    const total = cartTotalAmount();
+
+    // 訂單層的付款方式與發票（純贈品 $0 訂單不帶）
+    let payment = '', invoice = '';
+    if(total > 0){
+      payment = selectedPayment;
+      if($('#invoiceOn').checked){
+        const prefix = $('#invPrefix').value.trim();
+        const no = $('#invNo').value.trim();
+        invoice = prefix + no;
+        localStorage.setItem(KEY_INV_PREFIX, prefix);   // 記住前段
+        if(no) localStorage.setItem(KEY_INV_NO, incNumStr(no)); // 後段自動 +1
+      }
+    }
+
     Object.values(cart).forEach(line => {
       const p = products.find(x => x.id === line.id);
+      const isG = isGift(p);
       sales.push({
         time: now.toLocaleString('zh-TW', { hour12:false }),
         orderNo,
@@ -484,7 +579,9 @@
         qty: line.qty,
         price: p.price,
         subtotal: p.price * line.qty,
-        category: line.reason
+        category: line.reason,
+        payment: isG ? '' : payment,    // 贈品不帶付款方式
+        invoice: isG ? '' : invoice     // 贈品不帶發票
       });
     });
     saveSales();
@@ -517,8 +614,8 @@
 
   function exportCSV(){
     if(sales.length === 0){ showToast('目前沒有銷售紀錄可匯出', 'warn'); return; }
-    const header = ['時間','訂單編號','品項id','品名','數量','單價','小計','類別'];
-    const rows = sales.map(s => [s.time, s.orderNo, s.id, s.name, s.qty, s.price, s.subtotal, s.category]);
+    const header = ['時間','訂單編號','品項id','品名','數量','單價','小計','類別','付款方式','發票號碼'];
+    const rows = sales.map(s => [s.time, s.orderNo, s.id, s.name, s.qty, s.price, s.subtotal, s.category, s.payment || '', s.invoice || '']);
     const csv = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
     // 前面加 BOM(﻿)，Excel 開中文才不會亂碼
     const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' });
@@ -687,6 +784,22 @@
     $('#modalConfirm').addEventListener('click', submitOrder);
     $('#overlay').addEventListener('click', e => {
       if(e.target.id === 'overlay') closeCheckout();
+    });
+
+    // POS：付款方式切換（付現/刷卡）
+    $('#payToggle').addEventListener('click', e => {
+      const btn = e.target.closest('.pay-btn');
+      if(!btn) return;
+      selectedPayment = btn.dataset.pay;
+      document.querySelectorAll('#payToggle .pay-btn').forEach(b =>
+        b.classList.toggle('active', b === btn));
+      $('#changeRow').hidden = (selectedPayment !== '付現'); // 只有付現顯示找零
+    });
+    // POS：收現輸入 → 即時算找零
+    $('#cashGiven').addEventListener('input', updateChange);
+    // POS：開發票勾選 → 顯示/隱藏發票兩格
+    $('#invoiceOn').addEventListener('change', e => {
+      $('#invoiceBox').hidden = !e.target.checked;
     });
 
     // 贈品原因彈窗
