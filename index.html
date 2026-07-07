@@ -186,7 +186,7 @@
      ============================================================ */
 
   // 贈送原因（贈品用，要加減原因改這裡）
-  const GIFT_REASONS = ['公關贈送', '滿額贈', '扭蛋獎品'];
+  const GIFT_REASONS = ['業務公關贈送', '滿額贈品', '扭蛋贈品'];
 
   // 第一次啟動用的「種子商品」。之後商品以平板裡的存檔（localStorage）為準，
   // 要換商品有兩個方法：①改這份種子後按「開新的一天」重置 ②用「匯入商品」讀 CSV。
@@ -202,7 +202,11 @@
     { id:'21070942', cat:'beans', name:'巴拿馬 CCD計畫 Los Pozos 小農藝妓 日曬 Lot1', price:900,  unit:'包', stock:10, lowAt:3 },
     { id:'21070943', cat:'beans', name:'巴拿馬 CCD計畫 Los Pozos 小農藝妓 日曬 Lot2', price:870,  unit:'包', stock:10, lowAt:3 },
     { id:'21090153', cat:'beans', name:'玻利維亞 伊莎貝爾莊園 羅沙里歐 藝妓 水洗',     price:1000, unit:'包', stock:10, lowAt:3 },
-    // 贈品（扭蛋獎品／公關贈送／滿額贈）之後補上
+    // 贈品（發放時再選原因：業務公關贈送／滿額贈品／扭蛋贈品，共用同一份庫存）
+    { id:'g1', cat:'gift', name:'咖啡生豆 香妃 G1（贈品）', price:0, unit:'包', stock:4,  lowAt:1 },
+    { id:'g2', cat:'gift', name:'咖啡品飲杯',               price:0, unit:'個', stock:60, lowAt:5 },
+    { id:'g3', cat:'gift', name:'杯墊',                     price:0, unit:'個', stock:56, lowAt:5 },
+    { id:'g4', cat:'gift', name:'杜邦紙購物袋',             price:0, unit:'個', stock:20, lowAt:3 },
   ];
 
   // localStorage 的鍵名（資料就存在這幾個「抽屜」裡）
