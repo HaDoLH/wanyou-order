@@ -192,14 +192,17 @@
   // 要換商品有兩個方法：①改這份種子後按「開新的一天」重置 ②用「匯入商品」讀 CSV。
   //   cat:'beans' = 生豆（販售）；cat:'gift' = 贈品（價格 0、用「發放」記錄）
   const DEFAULT_PRODUCTS = [
-    { id:'b1', cat:'beans', name:'衣索比亞 耶加雪菲 G1', price:450, unit:'包', stock:30, lowAt:5 },
-    { id:'b2', cat:'beans', name:'瓜地馬拉 安提瓜',     price:480, unit:'包', stock:24, lowAt:5 },
-    { id:'b3', cat:'beans', name:'肯亞 AA TOP',          price:520, unit:'包', stock:4,  lowAt:5 },
-    { id:'b4', cat:'beans', name:'哥倫比亞 水洗',         price:420, unit:'包', stock:0,  lowAt:5 },
-    { id:'b5', cat:'beans', name:'巴西 喜拉朵 黃波旁',    price:400, unit:'包', stock:18, lowAt:5 },
-    { id:'g1', cat:'gift',  name:'壓克力杯墊',           price:0,   unit:'個', stock:10, lowAt:8 },
-    { id:'g2', cat:'gift',  name:'萬友馬克杯',            price:0,   unit:'個', stock:12, lowAt:5 },
-    { id:'g3', cat:'gift',  name:'帆布咖啡袋',            price:0,   unit:'個', stock:6,  lowAt:5 },
+    // 2026 台中咖啡展 · 一公斤販售（1公斤真空／包）
+    { id:'21080445', cat:'beans', name:'衣索比亞 神燈系列 谷吉 香妃 水洗 G1',        price:500,  unit:'包', stock:60, lowAt:10 },
+    { id:'21080462', cat:'beans', name:'衣索比亞 西達馬 班莎 聖塔維 水洗 G1',        price:500,  unit:'包', stock:60, lowAt:10 },
+    { id:'21080461', cat:'beans', name:'衣索比亞 谷吉 姬格薩處理廠 水洗 G1',         price:500,  unit:'包', stock:60, lowAt:10 },
+    { id:'21040851', cat:'beans', name:'巴拿馬 微光秘密系列 愛德華 小農藝妓 水洗 SHB EP', price:890,  unit:'包', stock:90, lowAt:10 },
+    // 高價單賣商品（500公克／包）
+    { id:'21090155', cat:'beans', name:'夏威夷 坎西諾農場 可那 Fancy 水洗',           price:1350, unit:'包', stock:10, lowAt:3 },
+    { id:'21070942', cat:'beans', name:'巴拿馬 CCD計畫 Los Pozos 小農藝妓 日曬 Lot1', price:900,  unit:'包', stock:10, lowAt:3 },
+    { id:'21070943', cat:'beans', name:'巴拿馬 CCD計畫 Los Pozos 小農藝妓 日曬 Lot2', price:870,  unit:'包', stock:10, lowAt:3 },
+    { id:'21090153', cat:'beans', name:'玻利維亞 伊莎貝爾莊園 羅沙里歐 藝妓 水洗',     price:1000, unit:'包', stock:10, lowAt:3 },
+    // 贈品（扭蛋獎品／公關贈送／滿額贈）之後補上
   ];
 
   // localStorage 的鍵名（資料就存在這幾個「抽屜」裡）
