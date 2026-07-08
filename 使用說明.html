@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>萬友咖啡 · 點單系統 使用說明</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  /* 萬友品牌色 */
+  :root{
+    --accent:#394253; --secondary:#ECD9C3; --warning:#F4A257;
+    --bg:#faf7f2; --border:#e3ddd2; --text:#2d2520; --soft:#6b5f53;
+    --success:#5a8a4a; --danger:#c44a3a;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  /* 列印時保留底色 */
+  html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{
+    font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;
+    color:var(--text); background:#fff; line-height:1.6; font-size:14px;
+  }
+  .serif{ font-family:"Noto Serif TC",serif; }
+
+  /* A4 版面 */
+  @page{ size:A4; margin:14mm 14mm; }
+  .page{ max-width:760px; margin:0 auto; padding:24px; }
+
+  /* 標題列 */
+  .head{
+    display:flex; align-items:center; gap:16px;
+    background:var(--accent); color:#fff;
+    padding:18px 22px; border-radius:12px; margin-bottom:6px;
+  }
+  .head img{ width:54px; height:54px; border-radius:50%; background:#fff; padding:4px; }
+  .head h1{ font-size:22px; letter-spacing:1px; }
+  .head .sub{ font-size:13px; color:var(--secondary); margin-top:3px; }
+
+  .intro{ font-size:13px; color:var(--soft); margin:10px 4px 18px; }
+  .intro b{ color:var(--accent); }
+
+  /* 區塊 */
+  .sec{
+    border:1px solid var(--border); border-radius:10px;
+    padding:14px 18px; margin-bottom:14px;
+    break-inside:avoid;
+  }
+  .sec h2{
+    font-size:17px; color:var(--accent);
+    display:flex; align-items:center; gap:10px; margin-bottom:8px;
+  }
+  .num{
+    flex:0 0 auto; width:26px; height:26px; border-radius:50%;
+    background:var(--accent); color:#fff; font-size:15px;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  ol,ul{ margin:4px 0 0 6px; padding-left:20px; }
+  li{ margin-bottom:4px; }
+  .key{
+    display:inline-block; background:var(--accent); color:#fff;
+    font-size:12px; font-weight:700; padding:2px 9px; border-radius:6px;
+    white-space:nowrap;
+  }
+  .key.warn{ background:var(--warning); color:#3a2a12; }
+  .key.danger{ background:var(--danger); }
+  .key.green{ background:var(--success); }
+  .tip{
+    background:rgba(244,162,87,.14); border-left:3px solid var(--warning);
+    padding:8px 12px; border-radius:0 6px 6px 0; margin-top:8px; font-size:13px;
+  }
+  .note-box{
+    background:rgba(196,74,58,.08); border:1px solid rgba(196,74,58,.3);
+    border-radius:8px; padding:12px 16px; margin-top:4px;
+  }
+  .note-box h2{ color:var(--danger); }
+  .foot{ text-align:center; font-size:12px; color:var(--soft); margin-top:10px; }
+  b{ color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="head">
+    <img src="images/icon.png" alt="萬友 logo" />
+    <div>
+      <h1 class="serif">萬友咖啡 · 點單系統</h1>
+      <div class="sub">店員操作使用說明</div>
+    </div>
+  </div>
+
+  <p class="intro">
+    這是一台<b>離線點單收銀機</b>：開著就能用、<b>不需要網路</b>，所有資料都存在這台平板裡。
+    從主畫面的「<b>萬友咖啡-點單系統</b>」圖示打開即可。
+  </p>
+
+  <!-- 1 -->
+  <div class="sec">
+    <h2><span class="num">1</span>每天開始營業前</h2>
+    <ol>
+      <li>從主畫面圖示打開 App，確認上方是綠色「<b>本機模式</b>」。</li>
+      <li>按右上角 <span class="key">開新的一天</span>：會自動備份昨天的紀錄、把營收歸零，庫存接續昨天剩下的。</li>
+    </ol>
+    <div class="tip">第一次使用、或要換商品時，按 <span class="key">匯入商品</span> 載入商品清單（Excel 檔）。</div>
+  </div>
+
+  <!-- 2 -->
+  <div class="sec">
+    <h2><span class="num">2</span>幫客人點生豆</h2>
+    <ol>
+      <li>上方選「<b>生豆</b>」分類。</li>
+      <li>點商品的 <span class="key">＋ 加入</span>，右邊「本筆訂單」會出現品項與金額。</li>
+      <li>數量用 <span class="key">－</span> <span class="key">＋</span> 調整；按「移除」可刪掉單項。</li>
+    </ol>
+    <div class="tip">商品卡片會顯示剩餘數量；快沒貨會出現橘字「⚠ 剩 N」，賣完會變灰「售罄」無法再加。</div>
+  </div>
+
+  <!-- 3 -->
+  <div class="sec">
+    <h2><span class="num">3</span>發放贈品</h2>
+    <ol>
+      <li>上方切到「<b>贈品</b>」分類。</li>
+      <li>點 <span class="key">＋ 發放</span> → 跳出選單，選原因：<b>公關贈送 / 滿額贈 / 扭蛋獎品</b>。</li>
+      <li>贈品會進到訂單（$0，不算錢），可和生豆一起結帳。</li>
+    </ol>
+  </div>
+
+  <!-- 4 -->
+  <div class="sec">
+    <h2><span class="num">4</span>結帳收銀</h2>
+    <ol>
+      <li>按 <span class="key green">結帳確認</span>，跟客人核對品項與「應收總額」。</li>
+      <li><b>付款方式</b>：選 <span class="key">付現</span> 或 <span class="key">刷卡</span>。</li>
+      <li><b>找零</b>（付現時）：在「收現」打客人給的金額，右邊自動算找零；不夠會紅字提醒。</li>
+      <li><b>開發票</b>（要開才勾）：勾「開發票」→ 前段固定（記住上次）、後段號碼自動 +1，可手改。</li>
+      <li>確認無誤 → 按 <span class="key green">完成並送出</span>，訂單就記錄好了。</li>
+    </ol>
+    <div class="tip">純贈品（$0）的訂單不會出現付款、找零、發票，直接送出即可。</div>
+  </div>
+
+  <!-- 5 -->
+  <div class="sec">
+    <h2><span class="num">5</span>現場補貨</h2>
+    <ol>
+      <li>按右上角 <span class="key">補貨</span>。</li>
+      <li>在要補的商品旁邊，輸入「<b>要增加的數量</b>」（例如補 10 包就打 10）。</li>
+      <li>按「確認補貨」→ 剩餘立刻增加。沒輸入的商品不變。</li>
+    </ol>
+  </div>
+
+  <!-- 6 -->
+  <div class="sec">
+    <h2><span class="num">6</span>收攤（每天結束）</h2>
+    <ol>
+      <li>按 <span class="key">匯出 CSV</span> → 下載當天所有訂單的報表（做帳用）。</li>
+      <li>按 <span class="key">開新的一天</span> → 會自動再備份一次，並把庫存接續到明天。</li>
+    </ol>
+  </div>
+
+  <!-- 注意事項 -->
+  <div class="sec note-box">
+    <h2><span class="num" style="background:var(--danger)">!</span>重要注意事項</h2>
+    <ul>
+      <li>資料存在<b>這台平板</b>裡，請固定用<b>同一台</b>當收銀機。</li>
+      <li><b>不要</b>清除瀏覽器資料 / 網站資料，否則紀錄會不見。</li>
+      <li>養成習慣：<b>收攤前先按「匯出 CSV」</b>備份；中午也可先匯出一次保險。</li>
+      <li>沒網路也能正常使用，不用擔心展場 Wi-Fi 不穩。</li>
+    </ul>
+  </div>
+
+  <p class="foot">萬友咖啡 · 台中咖啡展點單系統　|　hadolh.github.io/wanyou-order</p>
+
+</div>
+</body>
+</html>
