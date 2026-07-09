@@ -449,11 +449,16 @@ button{ font-family:inherit; cursor:pointer; }
 .pos-label{ font-size:14px; font-weight:600; color:var(--text-soft); }
 
 /* 付款方式切換鈕 */
-.pay-toggle{ display:flex; gap:0; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.pay-toggle{
+  display:flex; flex:1; flex-wrap:nowrap;   /* 佔滿剩餘寬度、絕不換行 */
+  gap:0; border:1px solid var(--border); border-radius:8px; overflow:hidden;
+}
 .pay-btn{
+  flex:1 1 0;                 /* 四顆平均分攤寬度，一起塞進同一行 */
+  white-space:nowrap;         /* 按鈕文字本身也不斷行 */
   border:none; background:var(--surface); color:var(--text);
   font-family:inherit; font-size:15px; font-weight:600;
-  padding:9px 22px; cursor:pointer; transition:.15s;
+  padding:9px 10px; cursor:pointer; transition:.15s;   /* 左右內距縮小，才排得下 */
 }
 .pay-btn + .pay-btn{ border-left:1px solid var(--border); }
 .pay-btn.active{ background:var(--accent); color:#fff; }
