@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet" />
 
   <!-- 樣式表。改 CSS 後把 ?v= 數字加一，強迫瀏覽器抓新版（破快取） -->
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
 
@@ -42,9 +42,15 @@
 
   <!-- ============ 管理工具列 ============ -->
   <div class="toolbar">
-    <div class="toolbar-stats" id="toolbarStats">訂單 0 筆 · 營收 $0</div>
+    <div class="toolbar-stats">
+      <!-- 第一行：訂單筆數 / 贈品 / 營收 -->
+      <div id="toolbarStats">訂單 0 筆 · 營收 $0</div>
+      <!-- 第二行：各付款方式收多少（只顯示有金額的） -->
+      <div id="payStats" class="pay-stats">尚無收款</div>
+    </div>
     <div class="toolbar-actions">
       <button class="btn-sm" id="restockBtn">補貨</button>
+      <button class="btn-sm" id="ordersBtn">訂單紀錄</button>
       <button class="btn-sm" id="importBtn">匯入商品</button>
       <button class="btn-sm" id="exportBtn">匯出 CSV</button>
       <button class="btn-sm danger-text" id="newDayBtn">開新的一天</button>
@@ -175,6 +181,38 @@
     </div>
   </div>
 
+  <!-- ============ 訂單紀錄彈窗（查看 / 改付款 / 刪除）============ -->
+  <div class="overlay" id="ordersOverlay">
+    <div class="modal modal-orders">
+      <h2>訂單紀錄</h2>
+      <div class="modal-sub">點單後如需更正，可在這裡改付款方式或刪除整筆訂單</div>
+      <!-- 各付款方式小計 -->
+      <div class="orders-summary" id="ordersSummary"><!-- 由 JS 產生 --></div>
+      <!-- 訂單清單（最新在最上面） -->
+      <div id="ordersList"><!-- 由 JS 產生 --></div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="ordersClose">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 修改付款方式彈窗 ============ -->
+  <div class="overlay" id="payEditOverlay">
+    <div class="modal modal-reason">
+      <h2>修改付款方式</h2>
+      <div class="modal-sub" id="payEditInfo">—</div>
+      <div class="reason-options" id="payEditOptions">
+        <button class="btn reason-btn" data-pay="付現">付現</button>
+        <button class="btn reason-btn" data-pay="刷卡">刷卡</button>
+        <button class="btn reason-btn" data-pay="LINE Pay">LINE Pay</button>
+        <button class="btn reason-btn" data-pay="匯款">匯款</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="payEditCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast 提示 -->
   <div class="toast" id="toast"></div>
 
@@ -189,6 +227,9 @@
 
   // 贈送原因（贈品用，要加減原因改這裡）
   const GIFT_REASONS = ['業務公關贈送', '滿額贈品', '扭蛋贈品'];
+
+  // 付款方式（結帳按鈕、付款總額、改付款方式都用這份；要加減方式改這裡）
+  const PAYMENT_METHODS = ['付現', '刷卡', 'LINE Pay', '匯款'];
 
   // 第一次啟動用的「種子商品」。之後商品以平板裡的存檔（localStorage）為準，
   // 要換商品有兩個方法：①改這份種子後按「開新的一天」重置 ②用「匯入商品」讀 CSV。
@@ -665,7 +706,18 @@
     if(sales.length === 0){ showToast('目前沒有銷售紀錄可匯出', 'warn'); return; }
     const header = ['時間','訂單編號','品項id','品名','數量','單價','小計','類別','付款方式','發票號碼'];
     const rows = sales.map(s => [s.time, s.orderNo, s.id, s.name, s.qty, s.price, s.subtotal, s.category, s.payment || '', s.invoice || '']);
-    const csv = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
+
+    // 表格最後附上「付款方式總計」：空一行 → 標題 → 每種付款方式一行 → 營收合計
+    const totals = paymentTotals();
+    const revenue = sales.reduce((sum, s) => sum + Number(s.subtotal), 0);
+    const summary = [
+      [],                         // 空一行，跟明細隔開
+      ['付款方式總計'],
+      ...PAYMENT_METHODS.map(m => [m, totals[m]]),
+      ['營收合計', revenue],
+    ];
+
+    const csv = [header, ...rows, ...summary].map(r => r.map(csvCell).join(',')).join('\r\n');
     // 前面加 BOM(﻿)，Excel 開中文才不會亂碼
     const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -775,6 +827,166 @@
     showToast(`已補貨 ${changed} 項`, 'success');
   }
 
+  /* ============================================================
+     ⑪-b 訂單紀錄：查看 / 改付款方式 / 刪除整筆
+     ============================================================
+     銷售紀錄 sales 是「一個品項一筆」，同一張單靠 orderNo 綁在一起。
+     這裡把它們「照 orderNo 分組」還原成一張張訂單來顯示。            */
+
+  // 把 sales 依 orderNo 分組成訂單陣列（最新的排最前面）
+  function getOrders(){
+    const map = {};
+    sales.forEach(s => {
+      if(!map[s.orderNo]){
+        map[s.orderNo] = { orderNo:s.orderNo, time:s.time, lines:[], total:0, payment:'', invoice:'' };
+      }
+      const o = map[s.orderNo];
+      o.lines.push(s);
+      o.total += Number(s.subtotal);
+      if(s.payment) o.payment = s.payment;   // 取這張單的付款方式（贈品行為空，會略過）
+      if(s.invoice) o.invoice = s.invoice;
+    });
+    // Object.values 會照「加入順序」，reverse 讓最新一筆排最上面
+    return Object.values(map).reverse();
+  }
+
+  let pendingPayEditOrderNo = null;   // 暫存：正在修改付款方式的訂單編號
+
+  function openOrders(){
+    renderOrders();
+    $('#ordersOverlay').classList.add('show');
+  }
+  function closeOrders(){ $('#ordersOverlay').classList.remove('show'); }
+
+  // 畫出訂單紀錄視窗的內容（付款小計 + 訂單清單）
+  function renderOrders(){
+    // ① 上方：各付款方式小計
+    const totals = paymentTotals();
+    const sumEl = $('#ordersSummary');
+    sumEl.innerHTML = PAYMENT_METHODS.map(m =>
+      `<div class="sum-item">
+         <span class="sum-label">${m}</span>
+         <span class="sum-amount">$${totals[m].toLocaleString()}</span>
+       </div>`).join('');
+
+    // ② 下方：訂單清單
+    const orders = getOrders();
+    const listEl = $('#ordersList');
+    if(orders.length === 0){
+      listEl.innerHTML = '<div class="cart-empty">今天還沒有訂單</div>';
+      return;
+    }
+
+    listEl.innerHTML = '';
+    orders.forEach(o => {
+      // 品項摘要：品名 ×數量，用頓號隔開
+      const itemsText = o.lines
+        .map(l => `${l.name} ×${l.qty}`)
+        .join('、');
+      // 只取「時分秒」讓畫面清爽（time 例：2026/7/11 下午2:30:15）
+      const timeShort = o.orderNo.split('-')[1]
+        ? o.orderNo.split('-')[1].replace(/(\d{2})(\d{2})(\d{2})/, '$1:$2:$3')
+        : o.time;
+      const isGiftOnly = o.total <= 0;   // 純贈品單：沒有付款方式，不能改付款
+      const payHtml = isGiftOnly
+        ? `<span class="ord-pay gift">純贈品</span>`
+        : `<span class="ord-pay">${o.payment || '—'}</span>`;
+      const invHtml = o.invoice ? `<span class="ord-inv">發票 ${o.invoice}</span>` : '';
+
+      const row = document.createElement('div');
+      row.className = 'order-card';
+      row.innerHTML = `
+        <div class="ord-head">
+          <span class="ord-time">${timeShort}</span>
+          ${payHtml}
+          <span class="ord-total">$${o.total.toLocaleString()}</span>
+        </div>
+        <div class="ord-items">${itemsText}</div>
+        <div class="ord-foot">
+          ${invHtml}
+          <div class="ord-actions">
+            ${isGiftOnly ? '' : `<button class="btn-sm" data-payedit="${o.orderNo}">改付款方式</button>`}
+            <button class="btn-sm danger-text" data-delorder="${o.orderNo}">刪除</button>
+          </div>
+        </div>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+
+  // 刪除整筆訂單：把該 orderNo 的所有品項行都移除，庫存自動回補
+  function deleteOrder(orderNo){
+    const order = getOrders().find(o => o.orderNo === orderNo);
+    if(!order) return;
+    if(!confirm(`確定刪除這筆訂單嗎？\n金額 $${order.total.toLocaleString()}\n刪除後庫存會自動加回，且無法復原。`)){
+      return;
+    }
+    sales = sales.filter(s => s.orderNo !== orderNo);
+    saveSales();
+    recomputeRemaining();   // 賣出數量減少 → 剩餘自動加回
+    refresh();
+    updateStats();
+    renderOrders();         // 視窗留著，重畫清單
+    showToast('已刪除該筆訂單', 'success');
+  }
+
+  // 開啟「修改付款方式」小視窗
+  function openPayEdit(orderNo){
+    const order = getOrders().find(o => o.orderNo === orderNo);
+    if(!order || order.total <= 0) return;   // 純贈品單不給改
+    pendingPayEditOrderNo = orderNo;
+    $('#payEditInfo').textContent = `金額 $${order.total.toLocaleString()}　目前：${order.payment || '—'}`;
+    // 標記目前的付款方式（讓店員看得出原本是哪個）
+    document.querySelectorAll('#payEditOptions .reason-btn').forEach(b =>
+      b.classList.toggle('current', b.dataset.pay === order.payment));
+    $('#payEditOverlay').classList.add('show');
+  }
+  function closePayEdit(){
+    $('#payEditOverlay').classList.remove('show');
+    pendingPayEditOrderNo = null;
+  }
+  // 套用新的付款方式：把該訂單「原本有付款方式」的品項行都改成新的（贈品行維持空）
+  function applyPayEdit(newPay){
+    if(!pendingPayEditOrderNo) return;
+    let changed = false;
+    sales.forEach(s => {
+      if(s.orderNo === pendingPayEditOrderNo && s.payment){
+        s.payment = newPay;
+        changed = true;
+      }
+    });
+    if(changed){
+      saveSales();
+      updateStats();
+      renderOrders();
+      showToast(`付款方式已改為「${newPay}」`, 'success');
+    }
+    closePayEdit();
+  }
+
+  // 各付款方式收了多少：把每筆銷售的小計，依它的付款方式累加
+  //   回傳像 { '付現':1200, '刷卡':500, 'LINE Pay':0, '匯款':0 }
+  function paymentTotals(){
+    const totals = {};
+    PAYMENT_METHODS.forEach(m => totals[m] = 0);   // 先全部歸 0，確保四種都在
+    sales.forEach(s => {
+      // 贈品的 payment 是空字串，會被跳過；只算有付款方式的
+      if(s.payment && totals[s.payment] !== undefined){
+        totals[s.payment] += Number(s.subtotal);
+      }
+    });
+    return totals;
+  }
+
+  // 把付款總額組成一行字：只列出「有金額」的方式（例：付現 $1,200 · 刷卡 $500）
+  function paymentSummaryText(){
+    const totals = paymentTotals();
+    const parts = PAYMENT_METHODS
+      .filter(m => totals[m] > 0)
+      .map(m => `${m} $${totals[m].toLocaleString()}`);
+    return parts.length ? parts.join('　·　') : '尚無收款';
+  }
+
   // 工具列統計：訂單筆數（不同訂單編號）＋ 贈品件數 ＋ 營收（小計加總）
   function updateStats(){
     const orderNos = new Set(sales.map(s => s.orderNo));
@@ -783,6 +995,8 @@
     const revenue = sales.reduce((sum, s) => sum + Number(s.subtotal), 0);
     $('#toolbarStats').textContent =
       `訂單 ${orderNos.size} 筆 · 贈品 ${giftQty} 件 · 營收 $${revenue.toLocaleString()}`;
+    // 第二行：各付款方式小計
+    $('#payStats').textContent = paymentSummaryText();
   }
 
   /* ============================================================
@@ -878,6 +1092,29 @@
     $('#restockConfirm').addEventListener('click', confirmRestock);
     $('#restockOverlay').addEventListener('click', e => {
       if(e.target.id === 'restockOverlay') closeRestock();
+    });
+
+    // 訂單紀錄彈窗
+    $('#ordersBtn').addEventListener('click', openOrders);
+    $('#ordersClose').addEventListener('click', closeOrders);
+    $('#ordersOverlay').addEventListener('click', e => {
+      if(e.target.id === 'ordersOverlay') closeOrders();
+    });
+    // 清單內的「改付款方式 / 刪除」——用事件委派抓 data 屬性
+    $('#ordersList').addEventListener('click', e => {
+      const t = e.target;
+      if(t.dataset.payedit) openPayEdit(t.dataset.payedit);
+      else if(t.dataset.delorder) deleteOrder(t.dataset.delorder);
+    });
+
+    // 修改付款方式小視窗
+    $('#payEditOptions').addEventListener('click', e => {
+      const btn = e.target.closest('[data-pay]');
+      if(btn) applyPayEdit(btn.dataset.pay);
+    });
+    $('#payEditCancel').addEventListener('click', closePayEdit);
+    $('#payEditOverlay').addEventListener('click', e => {
+      if(e.target.id === 'payEditOverlay') closePayEdit();
     });
 
     // 手機版購物車展開/收合

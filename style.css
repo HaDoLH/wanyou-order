@@ -111,6 +111,16 @@ h1,h2,.serif{
   font-size:14px;
   font-weight:600;
   color:var(--text-soft);
+  /* 兩行堆疊：第一行訂單/營收，第二行各付款方式小計 */
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+/* 第二行：各付款方式收多少（字小一點、橘色強調） */
+.toolbar-stats .pay-stats{
+  font-size:13px;
+  font-weight:600;
+  color:#a9682b;
 }
 .toolbar-actions{
   margin-left:auto;
@@ -428,6 +438,85 @@ button{ font-family:inherit; cursor:pointer; }
   outline:none;
   border-color:var(--accent);
   box-shadow:0 0 0 3px rgba(57,66,83,.15);
+}
+
+/* ===================================================================
+   訂單紀錄彈窗（付款小計 + 訂單清單 + 改付款/刪除）
+   =================================================================== */
+.modal-orders{ max-width:520px; }
+
+/* 上方：四種付款方式小計，做成一排色塊 */
+.orders-summary{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:8px;
+  margin-bottom:16px;
+}
+.orders-summary .sum-item{
+  background:var(--surface-soft);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 6px;
+  text-align:center;
+}
+.orders-summary .sum-label{ display:block; font-size:12px; color:var(--text-soft); }
+.orders-summary .sum-amount{
+  display:block; margin-top:2px;
+  font-size:16px; font-weight:700; color:var(--accent);
+}
+/* 手機／窄螢幕：四塊改成兩欄兩列，金額才不會被擠爆 */
+@media (max-width:480px){
+  .orders-summary{ grid-template-columns:repeat(2, 1fr); }
+}
+
+/* 訂單清單容器：太多筆時自己捲動 */
+#ordersList{ max-height:52vh; overflow:auto; margin-bottom:6px; }
+
+/* 單張訂單卡片 */
+.order-card{
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px 14px;
+  margin-bottom:10px;
+  background:var(--surface);
+}
+.order-card .ord-head{
+  display:flex; align-items:center; gap:10px;
+}
+.order-card .ord-time{ font-size:13px; color:var(--text-soft); font-variant-numeric:tabular-nums; }
+.order-card .ord-pay{
+  font-size:12px; font-weight:600;
+  color:var(--accent);
+  background:rgba(57,66,83,.08);
+  border-radius:999px; padding:2px 10px;
+}
+.order-card .ord-pay.gift{ color:#a9682b; background:rgba(244,162,87,.18); }
+.order-card .ord-total{
+  margin-left:auto;
+  font-size:18px; font-weight:700; color:var(--accent);
+}
+.order-card .ord-items{
+  font-size:14px; color:var(--text);
+  margin:8px 0;
+  line-height:1.5;
+}
+.order-card .ord-foot{
+  display:flex; align-items:center; gap:10px;
+}
+.order-card .ord-inv{ font-size:12px; color:var(--text-soft); }
+.order-card .ord-actions{
+  margin-left:auto;
+  display:flex; gap:8px;
+}
+
+/* 改付款方式視窗：標出「目前」那顆 */
+#payEditOptions .reason-btn.current{
+  border-color:var(--accent);
+  background:rgba(57,66,83,.08);
+}
+#payEditOptions .reason-btn.current::after{
+  content:'（目前）';
+  font-size:12px; color:var(--text-soft); font-weight:400;
 }
 
 .modal-total{
