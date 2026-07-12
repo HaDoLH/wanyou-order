@@ -440,6 +440,27 @@ button{ font-family:inherit; cursor:pointer; }
   box-shadow:0 0 0 3px rgba(57,66,83,.15);
 }
 
+/* ---- 庫存修改彈窗（展場商品庫存表）---- */
+#stockEditList{ max-height:46vh; overflow:auto; margin-bottom:6px; }
+/* 調整原因欄位 */
+.se-reason{ display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+.se-reason label{ font-size:13px; font-weight:600; color:var(--text-soft); }
+.se-reason input{
+  padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:15px;
+}
+.se-reason input:focus{
+  outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(57,66,83,.15);
+}
+/* 每項的「改成」數字輸入框（沿用補貨列版型：名稱 / 目前 / 輸入） */
+.restock-row .se-input{
+  width:80px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:6px;
+  font-size:15px; text-align:center;
+}
+.restock-row .se-input:focus{
+  outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(57,66,83,.15);
+}
+
 /* ===================================================================
    訂單紀錄彈窗（付款小計 + 訂單清單 + 改付款/刪除）
    =================================================================== */
@@ -551,6 +572,28 @@ button{ font-family:inherit; cursor:pointer; }
 }
 .pay-btn + .pay-btn{ border-left:1px solid var(--border); }
 .pay-btn.active{ background:var(--accent); color:#fff; }
+
+/* 折扣列（收現上方，自行輸入折抵金額） */
+.discount-row{ gap:10px; }
+.discount-row input{
+  flex:1; padding:10px 12px;
+  border:1px solid var(--border); border-radius:6px; font-size:16px;
+}
+.discount-row input:focus{
+  outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(57,66,83,.15);
+}
+.discount-out{
+  font-size:16px; font-weight:700; color:var(--warning);
+  white-space:nowrap; min-width:70px; text-align:right;
+}
+
+/* 應收總額左側：疊放「應收總額」標籤與（有折扣時的）原價提示 */
+.modal-total .mt-left{ display:flex; flex-direction:column; }
+.mt-orig{
+  font-size:12px; color:var(--text-soft);
+  text-decoration:line-through;   /* 原價劃掉，一看就懂被折扣了 */
+  margin-top:2px;
+}
 
 /* 找零列 */
 .change-row{

@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet" />
 
   <!-- 樣式表。改 CSS 後把 ?v= 數字加一，強迫瀏覽器抓新版（破快取） -->
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=12" />
 </head>
 <body>
 
@@ -105,7 +105,11 @@
       <div class="modal-sub">請與客人確認以下品項與金額</div>
       <div id="modalLines"><!-- 明細由 JS 產生 --></div>
       <div class="modal-total">
-        <span class="label">應收總額</span>
+        <div class="mt-left">
+          <span class="label">應收總額</span>
+          <!-- 有折扣時才顯示：原價 $XXX（劃掉樣式） -->
+          <span class="mt-orig" id="modalTotalOrig" hidden></span>
+        </div>
         <span class="amount" id="modalTotal">$0</span>
       </div>
 
@@ -120,6 +124,13 @@
             <button class="pay-btn" data-pay="LINE Pay">LINE Pay</button>
             <button class="pay-btn" data-pay="匯款">匯款</button>
           </div>
+        </div>
+
+        <!-- 折扣：自行輸入要折抵的金額，應收總額會即時扣掉（各付款方式都適用） -->
+        <div class="pos-row discount-row">
+          <label class="pos-label" for="discountInput">折扣</label>
+          <input type="number" id="discountInput" inputmode="numeric" min="0" placeholder="折扣金額" />
+          <span class="discount-out" id="discountOut">−$0</span>
         </div>
 
         <!-- 找零計算（選付現時才顯示） -->
@@ -177,6 +188,24 @@
       <div class="modal-actions">
         <button class="btn secondary" id="restockCancel">取消</button>
         <button class="btn primary" id="restockConfirm">確認補貨</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 庫存修改彈窗（展場商品庫存表）============ -->
+  <div class="overlay" id="stockEditOverlay">
+    <div class="modal modal-restock">
+      <h2>展場商品庫存表</h2>
+      <div class="modal-sub">直接把「目前庫存」改成正確數量，並填寫調整原因</div>
+      <!-- 調整原因（這批修改共用一個原因） -->
+      <div class="se-reason">
+        <label for="stockEditReason">調整原因</label>
+        <input type="text" id="stockEditReason" placeholder="例：盤點更正／破損／內部取用" />
+      </div>
+      <div id="stockEditList"><!-- 商品清單由 JS 產生 --></div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="stockEditCancel">取消</button>
+        <button class="btn primary" id="stockEditConfirm">確認修改</button>
       </div>
     </div>
   </div>
@@ -257,12 +286,14 @@
   const KEY_SALES    = 'wy_sales';           // 銷售紀錄（每行一筆）
   const KEY_INV_PREFIX = 'wy_invoice_prefix';// 發票前段（記住上次）
   const KEY_INV_NO     = 'wy_invoice_no';    // 發票下一個後段號碼（含前導 0）
+  const KEY_ADJUST     = 'wy_adjust';        // 庫存調整紀錄（現場修改庫存＋原因）
 
   /* ============================================================
      ② 程式狀態（資料）—— 改資料 → 存檔 → 重畫畫面
      ============================================================ */
   let products = [];        // 目前所有商品（含 remaining 即時剩餘）
   let sales = [];           // 本機銷售紀錄陣列
+  let adjustments = [];     // 庫存調整紀錄（現場改庫存＋原因，用於對帳）
   // 購物車：key = 「行」的唯一鍵，value = { id, qty, reason }
   //   生豆：key = id，          reason = '銷售'
   //   贈品：key = id + '|' + 原因，reason = 公關贈送 / 滿額贈 / 扭蛋獎品
@@ -297,6 +328,12 @@
   }
   function saveSales(){ localStorage.setItem(KEY_SALES, JSON.stringify(sales)); }
 
+  function loadAdjustments(){
+    const saved = localStorage.getItem(KEY_ADJUST);
+    adjustments = saved ? JSON.parse(saved) : [];
+  }
+  function saveAdjustments(){ localStorage.setItem(KEY_ADJUST, JSON.stringify(adjustments)); }
+
   // 即時剩餘 = 庫存總量 − 該商品在銷售紀錄的數量加總（與舊雲端同邏輯，改在本機算）
   function recomputeRemaining(){
     const soldById = {};
@@ -310,6 +347,7 @@
   function init(){
     loadProducts();
     loadSales();
+    loadAdjustments();
     recomputeRemaining();
     bindEvents();
     refresh();
@@ -417,6 +455,17 @@
         </div>`;
       productsEl.appendChild(pre);
     }
+
+    // 兩個分類底部都放「庫存修改」卡：開「展場商品庫存表」現場調整庫存＋填原因
+    const se = document.createElement('div');
+    se.className = 'card preorder-card';
+    se.innerHTML = `
+      <div class="name">庫存修改</div>
+      <div class="stock">現場調整庫存・填原因</div>
+      <div class="card-action">
+        <button class="btn primary" data-stockedit="1">＋ 修改</button>
+      </div>`;
+    productsEl.appendChild(se);
   }
 
   /* ============================================================
@@ -611,9 +660,11 @@
       b.classList.toggle('active', b.dataset.pay === '付現'));
     $('#changeRow').hidden = false;
 
-    // 找零：清空收現、顯示找零 $0
+    // 折扣：每次開視窗都清空
+    $('#discountInput').value = '';
+    // 找零：清空收現，並依折扣（此時為 0）重算應收與找零
     $('#cashGiven').value = '';
-    updateChange();
+    updateModalTotals();
 
     // 發票：預設不開；帶入記住的前段與下一個號碼
     $('#invoiceOn').checked = false;
@@ -622,9 +673,38 @@
     $('#invNo').value = localStorage.getItem(KEY_INV_NO) || '';
   }
 
-  // 找零 = 收現 − 應收
-  function updateChange(){
+  // 折扣金額：讀輸入框，取整數、不可為負、也不可超過總額
+  function currentDiscount(){
     const total = cartTotalAmount();
+    let d = Math.floor(Number($('#discountInput').value));
+    if(!Number.isFinite(d) || d < 0) d = 0;
+    return Math.min(d, total);   // 折扣最多只能折到 0 元，不會變負的
+  }
+  // 折扣後真正要收的金額
+  function payableAmount(){
+    return cartTotalAmount() - currentDiscount();
+  }
+  // 折扣改變時：更新「應收總額」「−$折扣」「原價提示」，並重算找零
+  function updateModalTotals(){
+    const total = cartTotalAmount();
+    const discount = currentDiscount();
+    // 應收總額顯示「折扣後」的金額
+    $('#modalTotal').textContent = '$' + (total - discount).toLocaleString();
+    $('#discountOut').textContent = '−$' + discount.toLocaleString();
+    // 有折扣才顯示原價（劃掉），沒折扣就藏起來
+    const orig = $('#modalTotalOrig');
+    if(discount > 0){
+      orig.hidden = false;
+      orig.textContent = '原價 $' + total.toLocaleString();
+    }else{
+      orig.hidden = true;
+    }
+    updateChange();
+  }
+
+  // 找零 = 收現 − 折扣後應收
+  function updateChange(){
+    const total = payableAmount();
     const out = $('#changeDue');
     if(!$('#cashGiven').value){ out.textContent = '找零 $0'; out.classList.remove('short'); return; }
     const diff = Number($('#cashGiven').value) - total;
@@ -644,10 +724,11 @@
     const orderNo = formatOrderNo(now);
     const total = cartTotalAmount();
 
-    // 訂單層的付款方式與發票（純贈品 $0 訂單不帶）
-    let payment = '', invoice = '';
+    // 訂單層的付款方式、發票、折扣（純贈品 $0 訂單不帶）
+    let payment = '', invoice = '', discount = 0;
     if(total > 0){
       payment = selectedPayment;
+      discount = currentDiscount();
       if($('#invoiceOn').checked){
         const prefix = $('#invPrefix').value.trim();
         const no = $('#invNo').value.trim();
@@ -674,6 +755,23 @@
         invoice: isG ? '' : invoice     // 贈品不帶發票
       });
     });
+
+    // 折扣：另存成一筆「負金額」紀錄，跟著這張單。
+    // 這樣營收、付款總額、CSV 都會自動扣掉，不用另外處理。
+    if(discount > 0){
+      sales.push({
+        time: now.toLocaleString('zh-TW', { hour12:false }),
+        orderNo,
+        id: 'discount',
+        name: '折扣',
+        qty: 1,
+        price: -discount,
+        subtotal: -discount,
+        category: '折扣',          // 特別標記，統計時排除在贈品之外
+        payment: payment,          // 跟著這張單的付款方式，付款總額才扣得對
+        invoice: ''
+      });
+    }
     saveSales();
     recomputeRemaining();
     cart = {};
@@ -703,7 +801,7 @@
   }
 
   function exportCSV(){
-    if(sales.length === 0){ showToast('目前沒有銷售紀錄可匯出', 'warn'); return; }
+    if(sales.length === 0 && adjustments.length === 0){ showToast('目前沒有紀錄可匯出', 'warn'); return; }
     const header = ['時間','訂單編號','品項id','品名','數量','單價','小計','類別','付款方式','發票號碼'];
     const rows = sales.map(s => [s.time, s.orderNo, s.id, s.name, s.qty, s.price, s.subtotal, s.category, s.payment || '', s.invoice || '']);
 
@@ -716,6 +814,13 @@
       ...PAYMENT_METHODS.map(m => [m, totals[m]]),
       ['營收合計', revenue],
     ];
+
+    // 再附上「庫存調整紀錄」（現場改庫存＋原因），方便對帳
+    if(adjustments.length){
+      summary.push([], ['庫存調整紀錄'], ['時間','品項id','品名','調整前','調整後','增減','原因']);
+      adjustments.forEach(a =>
+        summary.push([a.time, a.id, a.name, a.before, a.after, (a.delta > 0 ? '+' : '') + a.delta, a.reason]));
+    }
 
     const csv = [header, ...rows, ...summary].map(r => r.map(csvCell).join(',')).join('\r\n');
     // 前面加 BOM(﻿)，Excel 開中文才不會亂碼
@@ -782,6 +887,8 @@
     // ③ 清空今日紀錄（此時 remaining = 新 stock = 昨日剩餘）
     sales = [];
     saveSales();
+    adjustments = [];          // 庫存調整紀錄也一起歸零（已隨上面的 CSV 備份）
+    saveAdjustments();
     recomputeRemaining();
 
     cart = {};
@@ -825,6 +932,70 @@
     updateStats();
     closeRestock();
     showToast(`已補貨 ${changed} 項`, 'success');
+  }
+
+  /* ============================================================
+     ⑪-a 庫存修改：展場商品庫存表（直接改數量＋填原因）
+     ============================================================
+     跟「補貨」不同：補貨只能加，這裡可以把庫存「改成任何數字」，
+     用於盤點更正／破損／內部取用。每次修改都會存進 adjustments 紀錄。 */
+  function openStockEdit(){
+    const listEl = $('#stockEditList');
+    listEl.innerHTML = '';
+    products.forEach(p => {
+      const unit = p.unit || (isGift(p) ? '個' : '件');
+      const cur = p.remaining ?? 0;
+      const row = document.createElement('div');
+      row.className = 'restock-row';
+      // 輸入框「預設帶入目前庫存」，店員直接改成正確數字即可
+      row.innerHTML = `
+        <span class="r-name">${p.name}</span>
+        <span class="r-now">目前 ${cur} ${unit}</span>
+        <input type="number" class="se-input" data-id="${p.id}" min="0" inputmode="numeric" value="${cur}" />
+      `;
+      listEl.appendChild(row);
+    });
+    $('#stockEditReason').value = '';
+    $('#stockEditOverlay').classList.add('show');
+  }
+  function closeStockEdit(){ $('#stockEditOverlay').classList.remove('show'); }
+
+  function confirmStockEdit(){
+    const reason = $('#stockEditReason').value.trim();
+    // 先挑出「有改過」且有效的項目
+    const changes = [];
+    document.querySelectorAll('#stockEditList .se-input').forEach(input => {
+      const p = products.find(x => x.id === input.dataset.id);
+      if(!p) return;
+      const before = p.remaining ?? 0;
+      const after = Math.floor(Number(input.value));
+      if(!Number.isFinite(after) || after < 0) return;  // 空白/負數/亂填 → 跳過
+      if(after === before) return;                       // 沒改 → 跳過
+      changes.push({ p, before, after });
+    });
+
+    if(changes.length === 0){ showToast('沒有需要修改的庫存', 'warn'); return; }
+    if(!reason){ showToast('請填寫調整原因', 'warn'); return; }
+
+    const now = new Date();
+    const timeStr = now.toLocaleString('zh-TW', { hour12:false });
+    changes.forEach(({ p, before, after }) => {
+      // 已賣出數量固定，改「庫存總量」讓剩餘 = 店員填的數字
+      const sold = Number(p.stock) - before;   // sold = 原庫存總量 − 目前剩餘
+      p.stock = after + sold;                   // 新庫存總量，recompute 後剩餘就會 = after
+      adjustments.push({
+        time: timeStr, id: p.id, name: p.name,
+        before, after, delta: after - before, reason
+      });
+    });
+
+    saveProducts();
+    saveAdjustments();
+    recomputeRemaining();
+    refresh();
+    updateStats();
+    closeStockEdit();
+    showToast(`已修改 ${changes.length} 項庫存`, 'success');
   }
 
   /* ============================================================
@@ -990,8 +1161,9 @@
   // 工具列統計：訂單筆數（不同訂單編號）＋ 贈品件數 ＋ 營收（小計加總）
   function updateStats(){
     const orderNos = new Set(sales.map(s => s.orderNo));
-    // 贈品件數 = 類別不是「銷售」的數量加總（生豆固定為「銷售」，贈品為原因）
-    const giftQty = sales.reduce((sum, s) => sum + (s.category !== '銷售' ? Number(s.qty) : 0), 0);
+    // 贈品件數：排除「銷售 / 預購 / 折扣」，剩下的才是真正發放的贈品
+    const NON_GIFT_CATS = ['銷售', '預購', '折扣'];
+    const giftQty = sales.reduce((sum, s) => sum + (NON_GIFT_CATS.includes(s.category) ? 0 : Number(s.qty)), 0);
     const revenue = sales.reduce((sum, s) => sum + Number(s.subtotal), 0);
     $('#toolbarStats').textContent =
       `訂單 ${orderNos.size} 筆 · 贈品 ${giftQty} 件 · 營收 $${revenue.toLocaleString()}`;
@@ -1026,6 +1198,7 @@
       const t = e.target;
       if(t.dataset.add) addBean(t.dataset.add);
       else if(t.dataset.preorder) addPreorder();
+      else if(t.dataset.stockedit) openStockEdit();
       else if(t.dataset.give) openReason(t.dataset.give);
       else if(t.dataset.inc) changeQty(t.dataset.inc, 1);
       else if(t.dataset.dec) changeQty(t.dataset.dec, -1);
@@ -1059,6 +1232,8 @@
         b.classList.toggle('active', b === btn));
       $('#changeRow').hidden = (selectedPayment !== '付現'); // 只有付現顯示找零
     });
+    // POS：折扣輸入 → 即時重算應收與找零
+    $('#discountInput').addEventListener('input', updateModalTotals);
     // POS：收現輸入 → 即時算找零
     $('#cashGiven').addEventListener('input', updateChange);
     // POS：開發票勾選 → 顯示/隱藏發票兩格
@@ -1092,6 +1267,13 @@
     $('#restockConfirm').addEventListener('click', confirmRestock);
     $('#restockOverlay').addEventListener('click', e => {
       if(e.target.id === 'restockOverlay') closeRestock();
+    });
+
+    // 庫存修改彈窗（展場商品庫存表）——由商品區的「庫存修改」卡開啟
+    $('#stockEditCancel').addEventListener('click', closeStockEdit);
+    $('#stockEditConfirm').addEventListener('click', confirmStockEdit);
+    $('#stockEditOverlay').addEventListener('click', e => {
+      if(e.target.id === 'stockEditOverlay') closeStockEdit();
     });
 
     // 訂單紀錄彈窗
