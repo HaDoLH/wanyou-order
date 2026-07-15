@@ -254,8 +254,9 @@
      ① 設定區（你之後主要會動的地方）
      ============================================================ */
 
-  // 贈送原因（贈品用，要加減原因改這裡）
-  const GIFT_REASONS = ['業務公關贈送', '滿額贈品', '扭蛋贈品'];
+  // 贈送原因（贈品用）。※ 目前實際按鈕寫在下方 HTML 的 #reasonOptions，
+  //   這份常數僅作對照參考；如要增減原因，兩邊要一起改才會生效。
+  const GIFT_REASONS = ['公關贈送', '滿額贈', '扭蛋獎品'];
 
   // 付款方式（結帳按鈕、付款總額、改付款方式都用這份；要加減方式改這裡）
   const PAYMENT_METHODS = ['付現', '刷卡', 'LINE Pay', '匯款'];
@@ -274,7 +275,7 @@
     { id:'21070942', cat:'beans', name:'巴拿馬 CCD計畫 Los Pozos 小農藝妓 日曬 Lot1', price:900,  unit:'包', stock:10, lowAt:3 },
     { id:'21070943', cat:'beans', name:'巴拿馬 CCD計畫 Los Pozos 小農藝妓 日曬 Lot2', price:870,  unit:'包', stock:10, lowAt:3 },
     { id:'21090153', cat:'beans', name:'玻利維亞 伊莎貝爾莊園 羅沙里歐 藝妓 水洗',     price:1000, unit:'包', stock:10, lowAt:3 },
-    // 贈品（發放時再選原因：業務公關贈送／滿額贈品／扭蛋贈品，共用同一份庫存）
+    // 贈品（發放時再選原因：公關贈送／滿額贈／扭蛋獎品，共用同一份庫存）
     { id:'g1', cat:'gift', name:'咖啡生豆 香妃 G1（贈品）', price:0, unit:'包', stock:4,  lowAt:1 },
     { id:'g2', cat:'gift', name:'咖啡品飲杯',               price:0, unit:'個', stock:50, lowAt:5 },
     { id:'g3', cat:'gift', name:'杯墊',                     price:0, unit:'個', stock:50, lowAt:5 },

@@ -98,7 +98,7 @@
       <li>從主畫面圖示打開 App，確認上方是綠色「<b>本機模式</b>」。</li>
       <li>按右上角 <span class="key">開新的一天</span>：會自動備份昨天的紀錄、把營收歸零，庫存接續昨天剩下的。</li>
     </ol>
-    <div class="tip">第一次使用、或要換商品時，按 <span class="key">匯入商品</span> 載入商品清單（Excel 檔）。</div>
+    <div class="tip">第一次使用、或要換商品時，按 <span class="key">匯入商品</span> 載入商品清單（CSV 檔）。上方第一行顯示「訂單數・贈品・營收」，第二行顯示<b>各付款方式各收多少</b>。</div>
   </div>
 
   <!-- 2 -->
@@ -114,42 +114,64 @@
 
   <!-- 3 -->
   <div class="sec">
-    <h2><span class="num">3</span>發放贈品</h2>
+    <h2><span class="num">3</span>預購商品（現場客訂）</h2>
     <ol>
-      <li>上方切到「<b>贈品</b>」分類。</li>
-      <li>點 <span class="key">＋ 發放</span> → 跳出選單，選原因：<b>公關贈送 / 滿額贈 / 扭蛋獎品</b>。</li>
-      <li>贈品會進到訂單（$0，不算錢），可和生豆一起結帳。</li>
+      <li>生豆分類最下面有一張 <span class="key">預購商品</span> 卡，按「<b>＋ 輸入金額</b>」。</li>
+      <li>直接打客人的<b>客訂金額</b>（自訂價、不佔庫存），會成為訂單裡獨立一筆。</li>
+      <li>照一般流程結帳即可；這筆會計入營業額，方便統計。</li>
     </ol>
+    <div class="tip">預購是為了把「現場客訂」也算進當天營收。每筆固定 1 件，不用調數量。</div>
   </div>
 
   <!-- 4 -->
   <div class="sec">
-    <h2><span class="num">4</span>結帳收銀</h2>
+    <h2><span class="num">4</span>發放贈品</h2>
     <ol>
-      <li>按 <span class="key green">結帳確認</span>，跟客人核對品項與「應收總額」。</li>
-      <li><b>付款方式</b>：選 <span class="key">付現</span> 或 <span class="key">刷卡</span>。</li>
-      <li><b>找零</b>（付現時）：在「收現」打客人給的金額，右邊自動算找零；不夠會紅字提醒。</li>
-      <li><b>開發票</b>（要開才勾）：勾「開發票」→ 前段固定（記住上次）、後段號碼自動 +1，可手改。</li>
-      <li>確認無誤 → 按 <span class="key green">完成並送出</span>，訂單就記錄好了。</li>
+      <li>上方切到「<b>贈品</b>」分類。</li>
+      <li>點 <span class="key">＋ 發放</span> → 跳出選單，選原因：<b>公關贈送 / 滿額贈 / 扭蛋獎品</b>。</li>
+      <li>贈品會進到訂單（$0，不算錢），可和生豆一起結帳；三種原因共用同一份庫存。</li>
     </ol>
-    <div class="tip">純贈品（$0）的訂單不會出現付款、找零、發票，直接送出即可。</div>
   </div>
 
   <!-- 5 -->
   <div class="sec">
-    <h2><span class="num">5</span>現場補貨</h2>
+    <h2><span class="num">5</span>結帳收銀（付款・折扣・找零・發票）</h2>
     <ol>
-      <li>按右上角 <span class="key">補貨</span>。</li>
-      <li>在要補的商品旁邊，輸入「<b>要增加的數量</b>」（例如補 10 包就打 10）。</li>
-      <li>按「確認補貨」→ 剩餘立刻增加。沒輸入的商品不變。</li>
+      <li>按 <span class="key green">結帳確認</span>，跟客人核對品項與「應收總額」。</li>
+      <li><b>付款方式</b>：<span class="key">付現</span> <span class="key">刷卡</span> <span class="key">LINE Pay</span> <span class="key">匯款</span> 四選一。</li>
+      <li><b>折扣</b>（要折才填）：在「折扣」打要折抵的金額，應收會即時扣掉，原價劃掉顯示。</li>
+      <li><b>找零</b>（付現時）：在「收現」打客人給的金額，右邊自動算找零；不夠會紅字提醒。</li>
+      <li><b>開發票</b>（要開才勾）：前段固定（記住上次）、後段號碼自動 +1，可手改。</li>
+      <li>確認無誤 → 按 <span class="key green">完成並送出</span>。</li>
     </ol>
+    <div class="tip">純贈品（$0）的訂單不會出現付款、折扣、找零、發票，直接送出即可。</div>
   </div>
 
   <!-- 6 -->
   <div class="sec">
-    <h2><span class="num">6</span>收攤（每天結束）</h2>
+    <h2><span class="num">6</span>訂單紀錄（改付款 / 刪除）</h2>
     <ol>
-      <li>按 <span class="key">匯出 CSV</span> → 下載當天所有訂單的報表（做帳用）。</li>
+      <li>按右上角 <span class="key">訂單紀錄</span>，可看當天每一筆訂單與各付款方式小計。</li>
+      <li>點錯付款方式 → 按該筆的「<b>改付款方式</b>」重新選。</li>
+      <li>整筆點錯 → 按「<b>刪除</b>」，庫存會自動加回（無法復原，請確認再刪）。</li>
+    </ol>
+  </div>
+
+  <!-- 7 -->
+  <div class="sec">
+    <h2><span class="num">7</span>補貨 ＆ 庫存修改</h2>
+    <ul>
+      <li><span class="key">補貨</span>（只會<b>增加</b>）：新到貨時用。輸入「要增加的數量」，按確認庫存立刻加上去。</li>
+      <li>商品卡最下面的 <span class="key">庫存修改</span>（可改成<b>任何數字</b>）：盤點更正 / 破損 / 內部取用時用。直接把庫存改成正確數，並<b>填調整原因</b>，會存進紀錄供對帳。</li>
+    </ul>
+    <div class="tip">簡單記：<b>進貨用「補貨」，更正用「庫存修改」。</b></div>
+  </div>
+
+  <!-- 8 -->
+  <div class="sec">
+    <h2><span class="num">8</span>收攤（每天結束）</h2>
+    <ol>
+      <li>按 <span class="key">匯出 CSV</span> → 下載當天報表（明細＋<b>各付款方式總計</b>＋<b>庫存調整紀錄</b>，做帳用）。</li>
       <li>按 <span class="key">開新的一天</span> → 會自動再備份一次，並把庫存接續到明天。</li>
     </ol>
   </div>
