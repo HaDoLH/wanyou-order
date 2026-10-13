@@ -50,6 +50,7 @@
     </div>
     <div class="toolbar-actions">
       <button class="btn-sm" id="restockBtn">補貨</button>
+      <button class="btn-sm" id="priceEditBtn">改價</button>
       <button class="btn-sm" id="ordersBtn">訂單紀錄</button>
       <button class="btn-sm" id="importBtn">匯入商品</button>
       <button class="btn-sm" id="exportBtn">匯出 CSV</button>
@@ -188,6 +189,19 @@
       <div class="modal-actions">
         <button class="btn secondary" id="restockCancel">取消</button>
         <button class="btn primary" id="restockConfirm">確認補貨</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 改價彈窗（現場直接改售價）============ -->
+  <div class="overlay" id="priceEditOverlay">
+    <div class="modal modal-restock">
+      <h2>改價</h2>
+      <div class="modal-sub">直接改每項售價，改完立即生效（只影響之後的訂單，已記錄的不變）。贈品不列入。</div>
+      <div id="priceEditList"><!-- 清單由 JS 產生 --></div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="priceEditCancel">取消</button>
+        <button class="btn primary" id="priceEditConfirm">確認改價</button>
       </div>
     </div>
   </div>
@@ -938,6 +952,47 @@
   }
 
   /* ============================================================
+     ⑪-a2 改價：現場直接修改售價（只改之後的訂單，已記錄的不動）
+     ============================================================
+     平板現場就能改價，不用回去改程式或重匯 CSV。贈品($0)不列入。 */
+  function openPriceEdit(){
+    const listEl = $('#priceEditList');
+    listEl.innerHTML = '';
+    // 只列出可販售商品（排除贈品）
+    products.filter(p => !isGift(p)).forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'restock-row';
+      // 輸入框「預設帶入目前售價」，店員直接改成新價即可
+      row.innerHTML = `
+        <span class="r-name">${p.name}</span>
+        <span class="r-now">現價 $${p.price}</span>
+        <input type="number" class="se-input" data-id="${p.id}" min="0" inputmode="numeric" value="${p.price}" />
+      `;
+      listEl.appendChild(row);
+    });
+    $('#priceEditOverlay').classList.add('show');
+  }
+  function closePriceEdit(){ $('#priceEditOverlay').classList.remove('show'); }
+
+  function confirmPriceEdit(){
+    let changed = 0;
+    document.querySelectorAll('#priceEditList .se-input').forEach(input => {
+      const p = products.find(x => x.id === input.dataset.id);
+      if(!p) return;
+      const v = Math.floor(Number(input.value));
+      if(!Number.isFinite(v) || v <= 0) return;   // 空白/0/負數/亂填 → 跳過不改
+      if(v === Number(p.price)) return;            // 沒改 → 跳過
+      p.price = v;
+      changed++;
+    });
+    if(changed === 0){ showToast('沒有價格被修改', 'warn'); return; }
+    saveProducts();
+    refresh();                 // 重畫商品卡與購物車，立刻套用新價
+    closePriceEdit();
+    showToast(`已修改 ${changed} 項售價`, 'success');
+  }
+
+  /* ============================================================
      ⑪-a 庫存修改：展場商品庫存表（直接改數量＋填原因）
      ============================================================
      跟「補貨」不同：補貨只能加，這裡可以把庫存「改成任何數字」，
@@ -1270,6 +1325,14 @@
     $('#restockConfirm').addEventListener('click', confirmRestock);
     $('#restockOverlay').addEventListener('click', e => {
       if(e.target.id === 'restockOverlay') closeRestock();
+    });
+
+    // 改價彈窗
+    $('#priceEditBtn').addEventListener('click', openPriceEdit);
+    $('#priceEditCancel').addEventListener('click', closePriceEdit);
+    $('#priceEditConfirm').addEventListener('click', confirmPriceEdit);
+    $('#priceEditOverlay').addEventListener('click', e => {
+      if(e.target.id === 'priceEditOverlay') closePriceEdit();
     });
 
     // 庫存修改彈窗（展場商品庫存表）——由商品區的「庫存修改」卡開啟
