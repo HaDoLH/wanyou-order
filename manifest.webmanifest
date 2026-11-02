@@ -1,7 +1,7 @@
 {
   "name": "萬友咖啡點單",
   "short_name": "萬友點單",
-  "description": "台中咖啡展現場點單系統（純本機離線版）",
+  "description": "2026台北咖啡展現場點單系統（純本機離線版）",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
