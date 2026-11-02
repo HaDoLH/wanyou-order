@@ -6,13 +6,15 @@
  *  改版時把 CACHE 的版本號加一（例 wy-v1 → wy-v2），舊快取會自動清掉。
  *  =================================================================== */
 
-const CACHE = 'wy-v14';
+const CACHE = 'wy-v15';
 
 // 要預先快取的檔案（app shell）
 const ASSETS = [
   './',
   './index.html',
-  './style.css?v=12',
+  './style.css?v=13',
+  './sync.js?v=1',
+  './expo-orders.js?v=1',
   './manifest.webmanifest',
   './images/icon.png'
 ];
@@ -36,6 +38,8 @@ self.addEventListener('activate', event => {
 // 取用：cache-first（先找快取，沒有再上網抓；抓到的順手存起來）
 self.addEventListener('fetch', event => {
   if(event.request.method !== 'GET') return;
+  // 只處理自己網站的檔案；雲端連線（Firebase）要直接通過，不能被快取攔住
+  if(new URL(event.request.url).origin !== location.origin) return;
   event.respondWith(
     caches.match(event.request).then(cached => {
       if(cached) return cached;

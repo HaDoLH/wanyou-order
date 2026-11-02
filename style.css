@@ -701,3 +701,13 @@ button{ font-family:inherit; cursor:pointer; }
   font-size:17px;
   color:var(--accent);
 }
+/* ===== 訂購單（業務送來的訂單）===== */
+.expo-btn{ border-color:var(--accent); color:var(--accent); font-weight:600; }
+.expo-btn b{ color:#fff; background:var(--danger); border-radius:999px; padding:0 7px; font-size:12px; }
+.expo-btn b:empty{ display:none; }
+.expo-tabs{ display:flex; margin-bottom:10px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.expo-tabs .pay-btn{ flex:1; }
+.expo-input{ width:100%; min-height:44px; padding:9px 12px; margin-bottom:10px; font-size:16px;
+  border:1px solid var(--border); border-radius:var(--radius); box-sizing:border-box; }
+.expo-err{ color:var(--danger); font-size:14px; margin-bottom:10px; }
+#expoLogin .btn{ width:100%; }

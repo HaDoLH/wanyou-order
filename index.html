@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet" />
 
   <!-- 樣式表。改 CSS 後把 ?v= 數字加一，強迫瀏覽器抓新版（破快取） -->
-  <link rel="stylesheet" href="style.css?v=12" />
+  <link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
 
@@ -49,6 +49,7 @@
       <div id="payStats" class="pay-stats">尚無收款</div>
     </div>
     <div class="toolbar-actions">
+      <button class="btn-sm expo-btn" id="expoBtn">訂購單 <b id="expoCount"></b></button>
       <button class="btn-sm" id="restockBtn">補貨</button>
       <button class="btn-sm" id="priceEditBtn">改價</button>
       <button class="btn-sm" id="ordersBtn">訂單紀錄</button>
@@ -128,7 +129,7 @@
         </div>
 
         <!-- 折扣：自行輸入要折抵的金額，應收總額會即時扣掉（各付款方式都適用） -->
-        <div class="pos-row discount-row">
+        <div class="pos-row discount-row" id="discountRow">
           <label class="pos-label" for="discountInput">折扣</label>
           <input type="number" id="discountInput" inputmode="numeric" min="0" placeholder="折扣金額" />
           <span class="discount-out" id="discountOut">−$0</span>
@@ -158,6 +159,7 @@
       </div>
 
       <div class="modal-actions">
+        <button class="btn danger" id="modalReturn" hidden>退回業務</button>
         <button class="btn secondary" id="modalCancel">返回修改</button>
         <button class="btn primary" id="modalConfirm">完成並送出</button>
       </div>
@@ -252,6 +254,33 @@
       </div>
       <div class="modal-actions">
         <button class="btn secondary" id="payEditCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 訂購單（業務送來的 5KG 以上訂單）============ -->
+  <div class="overlay" id="expoOverlay">
+    <div class="modal modal-orders">
+      <h2>訂購單</h2>
+      <!-- 還沒登入時顯示 -->
+      <form id="expoLogin" hidden>
+        <div class="modal-sub">請輸入密碼，這台平板之後會記住</div>
+        <input type="password" id="expoPass" class="expo-input" placeholder="密碼" autocomplete="current-password" />
+        <div class="expo-err" id="expoErr" hidden></div>
+        <button type="submit" class="btn primary">登入</button>
+      </form>
+      <!-- 登入後的即時清單 -->
+      <div id="expoMain" hidden>
+        <div class="expo-tabs" id="expoTabs">
+          <button class="pay-btn active" data-tab="pending">待結帳</button>
+          <button class="pay-btn" data-tab="paid">已付款</button>
+          <button class="pay-btn" data-tab="other">其他</button>
+        </div>
+        <input type="text" id="expoSearch" class="expo-input" placeholder="搜尋姓名、電話、訂單編號" autocomplete="off" />
+        <div id="expoList"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="expoClose">關閉</button>
       </div>
     </div>
   </div>
@@ -541,7 +570,11 @@
     miniEl.textContent = count + ' 件　$' + total.toLocaleString();
   }
 
+  // 正在結帳的訂購單（null = 一般現場結帳）。金額以業務送來的為準，櫃台不能改
+  let expoPay = null;
+
   function cartTotalAmount(){
+    if(expoPay) return expoPay.total;
     return Object.values(cart).reduce((sum, line) => {
       const info = lineInfo(line);
       return sum + (info ? info.price * line.qty : 0);
@@ -663,7 +696,12 @@
     setupPosBox(total);
     $('#overlay').classList.add('show');
   }
-  function closeCheckout(){ $('#overlay').classList.remove('show'); }
+  function closeCheckout(){
+    $('#overlay').classList.remove('show');
+    expoPay = null;
+    $('#discountRow').hidden = false;
+    $('#modalReturn').hidden = true;
+  }
 
   // 依應收金額準備 POS 區（付款方式/找零/發票）
   function setupPosBox(total){
@@ -1113,10 +1151,13 @@
         .map(l => `${l.name} ×${l.qty}`)
         .join('、');
       // 只取「時分秒」讓畫面清爽（time 例：2026/7/11 下午2:30:15）
-      const timeShort = o.orderNo.split('-')[1]
-        ? o.orderNo.split('-')[1].replace(/(\d{2})(\d{2})(\d{2})/, '$1:$2:$3')
-        : o.time;
-      const isGiftOnly = o.total <= 0;   // 純贈品單：沒有付款方式，不能改付款
+      const timeShort = isExpoNo(o.orderNo) ? o.orderNo
+        : o.orderNo.split('-')[1]
+          ? o.orderNo.split('-')[1].replace(/(\d{2})(\d{2})(\d{2})/, '$1:$2:$3')
+          : o.time;
+      const isExpo = o.lines.some(l => l.category === '訂購單');   // 訂購單：雲端為準，不能在這裡刪除
+      const isVoid = isExpo && o.total < 0;                         // 訂購單作廢的退款紀錄
+      const isGiftOnly = !isExpo && o.total <= 0;   // 純贈品單：沒有付款方式，不能改付款
       const payHtml = isGiftOnly
         ? `<span class="ord-pay gift">純贈品</span>`
         : `<span class="ord-pay">${o.payment || '—'}</span>`;
@@ -1134,8 +1175,8 @@
         <div class="ord-foot">
           ${invHtml}
           <div class="ord-actions">
-            ${isGiftOnly ? '' : `<button class="btn-sm" data-payedit="${o.orderNo}">改付款方式</button>`}
-            <button class="btn-sm danger-text" data-delorder="${o.orderNo}">刪除</button>
+            ${isGiftOnly || isVoid ? '' : `<button class="btn-sm" data-payedit="${o.orderNo}">改付款方式</button>`}
+            ${isExpo ? '' : `<button class="btn-sm danger-text" data-delorder="${o.orderNo}">刪除</button>`}
           </div>
         </div>
       `;
@@ -1177,6 +1218,8 @@
   // 套用新的付款方式：把該訂單「原本有付款方式」的品項行都改成新的（贈品行維持空）
   function applyPayEdit(newPay){
     if(!pendingPayEditOrderNo) return;
+    // 訂購單的付款方式也要更新雲端，業務那邊的印章才會一致
+    if(isExpoNo(pendingPayEditOrderNo)) Sync.setPayMethod(pendingPayEditOrderNo, newPay).catch(e => showToast(syncErrorText(e), 'warn'));
     let changed = false;
     sales.forEach(s => {
       if(s.orderNo === pendingPayEditOrderNo && s.payment){
@@ -1220,7 +1263,7 @@
   function updateStats(){
     const orderNos = new Set(sales.map(s => s.orderNo));
     // 贈品件數：排除「銷售 / 預購 / 折扣」，剩下的才是真正發放的贈品
-    const NON_GIFT_CATS = ['銷售', '預購', '折扣'];
+    const NON_GIFT_CATS = ['銷售', '預購', '折扣', '訂購單'];
     const giftQty = sales.reduce((sum, s) => sum + (NON_GIFT_CATS.includes(s.category) ? 0 : Number(s.qty)), 0);
     const revenue = sales.reduce((sum, s) => sum + Number(s.subtotal), 0);
     $('#toolbarStats').textContent =
@@ -1276,7 +1319,8 @@
 
     // 結帳彈窗
     $('#modalCancel').addEventListener('click', closeCheckout);
-    $('#modalConfirm').addEventListener('click', submitOrder);
+    $('#modalConfirm').addEventListener('click', () => expoPay ? confirmExpoPay() : submitOrder());
+    $('#modalReturn').addEventListener('click', () => returnExpoOrder());
     $('#overlay').addEventListener('click', e => {
       if(e.target.id === 'overlay') closeCheckout();
     });
@@ -1383,5 +1427,7 @@
   // 出發！
   init();
   </script>
+  <script src="sync.js?v=1"></script>
+  <script src="expo-orders.js?v=1"></script>
 </body>
 </html>
