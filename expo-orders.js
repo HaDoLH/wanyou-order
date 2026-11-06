@@ -17,15 +17,15 @@ let expoPendingSeen = null;
 // 訂購單編號長得像 1114-A-007（現場結帳是 20261114-143015）
 function isExpoNo(no) { return /^\d{4}-[A-Z0-9]{1,2}-\d{3}/.test(no); }
 
-/** 訂單裡的水果特調扣庫存（sign=1 扣、-1 加回）。只扣水果特調，
-    同品號的 1KG 現貨（例如風信子）不會被 5KG 訂單扣到 */
-function fruitStockLines(rec, orderNo, sign) {
-  const fruitIds = new Set(products.filter(p => p.cat === 'fruit').map(p => p.id));
-  const time = new Date().toLocaleString('zh-TW', { hour12: false });
-  return rec.order.rows.filter(r => fruitIds.has(r.id)).map(r => ({
-    time, orderNo, id: r.id, name: `${sign > 0 ? '扣庫存' : '加回庫存'} ${r.name}`,
-    qty: sign * r.kg, price: 0, subtotal: 0, category: '訂購單扣庫存', payment: '', invoice: '',
-  }));
+/* 水果特調庫存放在雲端（stock/fruit），業務送單時就佔用、取消／刪除／作廢自動歸還，
+   櫃台不用另外扣。總庫存在「庫存修改」裡改（只有結帳平板能改）。 */
+let fruitStock = null;   // { 品號: { name, total, reserved } }；null＝還沒登入或沒網路
+
+/** 水果特調卡片與庫存修改要顯示的數字（index.html 會呼叫） */
+function fruitInfo(id) {
+  if (!fruitStock) return null;
+  const it = fruitStock[id] || { total: 0, reserved: 0 };
+  return { total: it.total, reserved: it.reserved, left: it.total - it.reserved };
 }
 
 function expoEsc(s) {
@@ -122,10 +122,7 @@ async function confirmExpoPay() {
       qty: 1, price: total, subtotal: total,
       category: '訂購單', payment: selectedPayment, invoice,
     });
-    sales.push(...fruitStockLines(rec, rec.no, 1));
     saveSales();
-    recomputeRemaining();
-    refresh();
     updateStats();
     closeCheckout();
     showToast('已確認付款', 'success');
@@ -165,10 +162,7 @@ async function voidExpoOrder(no) {
       qty: 1, price: -rec.total, subtotal: -rec.total,
       category: '訂購單', payment: rec.paid.method, invoice: '',
     });
-    sales.push(...fruitStockLines(rec, `${no}-作廢`, -1));
     saveSales();
-    recomputeRemaining();
-    refresh();
     updateStats();
     showToast('已作廢，業務可以複製成新單', 'success');
   } catch (e) {
@@ -193,6 +187,10 @@ async function deleteExpoOrder(no) {
 
 function openExpo() { paintExpoPanel(); $('#expoOverlay').classList.add('show'); }
 function closeExpo() { $('#expoOverlay').classList.remove('show'); }
+
+function startStockWatch() {
+  Sync.watchStock(items => { fruitStock = items; refresh(); }, e => console.error(e)).catch(console.error);
+}
 
 function startExpoWatch() {
   Sync.watch(list => {
@@ -238,7 +236,7 @@ function initExpo() {
   let watching = false;
   Sync.onUser(user => {
     expoUser = user;
-    if (user && !watching) { watching = true; startExpoWatch(); }
+    if (user && !watching) { watching = true; startExpoWatch(); startStockWatch(); }
     if ($('#expoOverlay').classList.contains('show')) paintExpoPanel();
   }).catch(console.error);  // 沒網路：一般結帳不受影響
 }

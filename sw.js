@@ -6,15 +6,15 @@
  *  改版時把 CACHE 的版本號加一（例 wy-v1 → wy-v2），舊快取會自動清掉。
  *  =================================================================== */
 
-const CACHE = 'wy-v19';
+const CACHE = 'wy-v20';
 
 // 要預先快取的檔案（app shell）
 const ASSETS = [
   './',
   './index.html',
   './style.css?v=14',
-  './sync.js?v=2',
-  './expo-orders.js?v=2',
+  './sync.js?v=3',
+  './expo-orders.js?v=4',
   './manifest.webmanifest',
   './images/icon.png'
 ];

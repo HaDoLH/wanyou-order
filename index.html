@@ -479,7 +479,7 @@
       let stockHtml = '';
       if(p.remaining !== undefined && p.remaining !== null){
         const unit = p.unit || (isGift(p) ? '個' : '');
-        if(isFruit(p))         stockHtml = `<div class="stock fruit-stock">剩 ${p.remaining} ${unit}</div>`;
+        if(isFruit(p))         stockHtml = '';
         else if(p.remaining <= 0) stockHtml = `<div class="stock out">${isGift(p)?'已送完':'已售罄'}</div>`;
         else if(isLow(p))      stockHtml = `<div class="stock low">⚠ 剩 ${p.remaining} ${unit}</div>`;
         else                   stockHtml = `<div class="stock">剩 ${p.remaining} ${unit}</div>`;
@@ -488,8 +488,13 @@
       let priceHtml, actionHtml;
 
       if(isFruit(p)){
+        // 水果特調：顯示雲端庫存（業務送單就佔用），可設定總庫存
+        const info = typeof fruitInfo === 'function' ? fruitInfo(p.id) : null;
         priceHtml = `<div class="price gift-price">訂購單專用</div>`;
-        actionHtml = `<div class="fruit-note">客人訂購後，付款時自動扣庫存</div>`;
+        stockHtml = !info ? `<div class="fruit-note">登入「訂購單」後顯示庫存</div>`
+          : info.left < 0 ? `<div class="stock out">超賣 ${-info.left} KG</div><div class="fruit-note">總庫存 ${info.total}・已訂 ${info.reserved} KG</div>`
+          : `<div class="stock fruit-stock">可訂 ${info.left} KG</div><div class="fruit-note">總庫存 ${info.total}・已訂 ${info.reserved} KG</div>`;
+        actionHtml = `<div class="fruit-note">要改庫存請用「庫存修改」</div>`;
       }else if(isGift(p)){
         priceHtml = `<div class="price gift-price">🎁 贈品</div>`;
         const badge = inCart > 0 ? `<div class="given-badge">已選 ${inCart} 個</div>` : '';
@@ -537,6 +542,7 @@
     }
 
     // 每個分類底部都放「庫存修改」卡：開「展場商品庫存表」現場調整庫存＋填原因
+    //   （水果特調的總庫存也在這裡改，存到雲端；只有結帳平板能改）
     const se = document.createElement('div');
     se.className = 'card preorder-card';
     se.innerHTML = `
@@ -990,7 +996,7 @@
   function openRestock(){
     const listEl = $('#restockList');
     listEl.innerHTML = '';
-    products.forEach(p => {
+    products.filter(p => !isFruit(p)).forEach(p => {
       const unit = p.unit || (isGift(p) ? '個' : '件');
       const row = document.createElement('div');
       row.className = 'restock-row';
@@ -1072,11 +1078,27 @@
   function openStockEdit(){
     const listEl = $('#stockEditList');
     listEl.innerHTML = '';
-    products.forEach(p => {
-      const unit = p.unit || (isGift(p) ? '個' : '件');
-      const cur = p.remaining ?? 0;
+    // 從水果特調頁打開時，水果特調排最前面
+    const fruitsFirst = currentCat === 'fruit';
+    const list = [...products].sort((a, b) => fruitsFirst ? (isFruit(b) - isFruit(a)) : 0);
+    list.forEach(p => {
       const row = document.createElement('div');
       row.className = 'restock-row';
+      if(isFruit(p)){
+        // 水果特調：改的是雲端「總庫存（KG）」，業務那邊會即時看到可訂量
+        const info = typeof fruitInfo === 'function' ? fruitInfo(p.id) : null;
+        row.innerHTML = info
+          ? `<span class="r-name">${p.name}</span>
+             <span class="r-now">總庫存 ${info.total} KG<br><small>已訂 ${info.reserved} KG</small></span>
+             <input type="number" class="se-input" data-id="${p.id}" data-fruit="1" min="0" inputmode="numeric" value="${info.total}" />`
+          : `<span class="r-name">${p.name}</span>
+             <span class="r-now">請先按「訂購單」登入</span>
+             <input type="number" class="se-input" disabled placeholder="—" />`;
+        listEl.appendChild(row);
+        return;
+      }
+      const unit = p.unit || (isGift(p) ? '個' : '件');
+      const cur = p.remaining ?? 0;
       // 輸入框「預設帶入目前庫存」，店員直接改成正確數字即可
       row.innerHTML = `
         <span class="r-name">${p.name}</span>
@@ -1090,14 +1112,14 @@
   }
   function closeStockEdit(){ $('#stockEditOverlay').classList.remove('show'); }
 
-  function confirmStockEdit(){
+  async function confirmStockEdit(){
     const reason = $('#stockEditReason').value.trim();
     // 先挑出「有改過」且有效的項目
     const changes = [];
     document.querySelectorAll('#stockEditList .se-input').forEach(input => {
       const p = products.find(x => x.id === input.dataset.id);
       if(!p) return;
-      const before = p.remaining ?? 0;
+      const before = input.dataset.fruit ? fruitInfo(p.id).total : (p.remaining ?? 0);
       const after = Math.floor(Number(input.value));
       if(!Number.isFinite(after) || after < 0) return;  // 空白/負數/亂填 → 跳過
       if(after === before) return;                       // 沒改 → 跳過
@@ -1107,9 +1129,23 @@
     if(changes.length === 0){ showToast('沒有需要修改的庫存', 'warn'); return; }
     if(!reason){ showToast('請填寫調整原因', 'warn'); return; }
 
+    // 水果特調：先寫雲端，失敗就整批不存（避免紀錄跟雲端對不起來）
+    const fruitChanges = changes.filter(c => isFruit(c.p));
+    try{
+      for(const { p, after } of fruitChanges) await Sync.setFruitTotal(p.id, p.name, after);
+    }catch(e){
+      console.error(e);
+      showToast('水果特調庫存存不進雲端，請檢查網路', 'warn');
+      return;
+    }
+
     const now = new Date();
     const timeStr = now.toLocaleString('zh-TW', { hour12:false });
     changes.forEach(({ p, before, after }) => {
+      if(isFruit(p)){   // 水果特調在雲端，這裡只留調整紀錄
+        adjustments.push({ time: timeStr, id: p.id, name: p.name + '（總庫存KG）', before, after, delta: after - before, reason });
+        return;
+      }
       // 已賣出數量固定，改「庫存總量」讓剩餘 = 店員填的數字
       const sold = Number(p.stock) - before;   // sold = 原庫存總量 − 目前剩餘
       p.stock = after + sold;                   // 新庫存總量，recompute 後剩餘就會 = after
@@ -1461,7 +1497,7 @@
   // 出發！
   init();
   </script>
-  <script src="sync.js?v=2"></script>
-  <script src="expo-orders.js?v=2"></script>
+  <script src="sync.js?v=3"></script>
+  <script src="expo-orders.js?v=4"></script>
 </body>
 </html>
