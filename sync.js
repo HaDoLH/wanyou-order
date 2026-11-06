@@ -6,7 +6,7 @@
 
    下面的設定本來就可以公開，保護資料的是「登入」和 Firestore 規則。
    訂單狀態：pending 待付款 / paid 已付款 / returned 已退回
-            void 已作廢 / cancelled 已取消
+            void 已作廢 / cancelled 已取消 / deleted 已刪除（清單不顯示，雲端留紀錄）
    ========================================================= */
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyDyhn05DhieDqmnNzdkjrxYxgxbXMUpbL0',
@@ -18,7 +18,7 @@ const FIREBASE_CONFIG = {
 };
 
 const STATUS_LABEL = {
-  pending: '待付款', paid: '已付款', returned: '已退回', void: '已作廢', cancelled: '已取消',
+  pending: '待付款', paid: '已付款', returned: '已退回', void: '已作廢', cancelled: '已取消', deleted: '已刪除',
 };
 
 const Sync = (() => {
@@ -94,6 +94,8 @@ const Sync = (() => {
     giveBack: (no, version, reason) => change(no, version, ['pending'], { status: 'returned', returnReason: reason }),
     voidOrder: (no, reason) => change(no, null, ['paid'], { status: 'void', voidReason: reason, voidAt: Date.now() }),
     setPayMethod: (no, method) => change(no, null, ['paid'], (cur) => ({ paid: { ...cur.paid, method } })),
+    /** 櫃台：刪除還沒付款的單（只是從清單移除，雲端留紀錄；已付款要走作廢） */
+    remove: (no) => change(no, null, ['pending', 'returned', 'cancelled'], { status: 'deleted', deletedAt: Date.now() }),
   };
 })();
 

@@ -17,6 +17,17 @@ let expoPendingSeen = null;
 // 訂購單編號長得像 1114-A-007（現場結帳是 20261114-143015）
 function isExpoNo(no) { return /^\d{4}-[A-Z0-9]{1,2}-\d{3}/.test(no); }
 
+/** 訂單裡的水果特調扣庫存（sign=1 扣、-1 加回）。只扣水果特調，
+    同品號的 1KG 現貨（例如風信子）不會被 5KG 訂單扣到 */
+function fruitStockLines(rec, orderNo, sign) {
+  const fruitIds = new Set(products.filter(p => p.cat === 'fruit').map(p => p.id));
+  const time = new Date().toLocaleString('zh-TW', { hour12: false });
+  return rec.order.rows.filter(r => fruitIds.has(r.id)).map(r => ({
+    time, orderNo, id: r.id, name: `${sign > 0 ? '扣庫存' : '加回庫存'} ${r.name}`,
+    qty: sign * r.kg, price: 0, subtotal: 0, category: '訂購單扣庫存', payment: '', invoice: '',
+  }));
+}
+
 function expoEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 }
@@ -31,7 +42,7 @@ function paintExpoCount() {
 
 function renderExpoList() {
   const q = $('#expoSearch').value.trim();
-  const inTab = o => expoTab === 'other' ? !['pending', 'paid'].includes(o.status) : o.status === expoTab;
+  const inTab = o => expoTab === 'other' ? !['pending', 'paid', 'deleted'].includes(o.status) : o.status === expoTab;
   const list = expoOrders
     .filter(o => inTab(o) && (!q || [o.no, o.name, o.phone].some(v => String(v).includes(q))))
     .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -49,6 +60,7 @@ function renderExpoList() {
       <div class="ord-foot">
         <span class="ord-inv">${o.status === 'paid' ? `${expoEsc(o.paid.method)}${o.paid.invoice ? '　發票 ' + expoEsc(o.paid.invoice) : ''}` : expoEsc(o.returnReason || o.voidReason || '')}</span>
         <div class="ord-actions">
+          ${['pending', 'returned', 'cancelled'].includes(o.status) ? `<button class="btn-sm danger-text" data-expodel="${expoEsc(o.no)}">刪除訂單</button>` : ''}
           ${o.status === 'pending' ? `<button class="btn-sm" data-expopay="${expoEsc(o.no)}">結帳</button>` : ''}
           ${o.status === 'paid' ? `<button class="btn-sm danger-text" data-expovoid="${expoEsc(o.no)}">作廢</button>` : ''}
         </div>
@@ -73,7 +85,7 @@ function openExpoCheckout(no) {
   const line = (left, right) => `<div class="modal-line"><span>${left}</span><span>${right}</span></div>`;
   $('#modalLines').innerHTML =
     `<div class="modal-note">${expoEsc(rec.no)}　${expoEsc(rec.name)}　${expoEsc(rec.phone)}　經手：${expoEsc(rec.staff) || '—'}</div>` +
-    o.rows.map(r => line(`${expoEsc(r.name)} <span class="m-qty">${expoEsc(r.spec)}（$${r.price}/kg）</span>`, `$${r.subtotal.toLocaleString()}`)).join('') +
+    o.rows.map(r => line(`${expoEsc(r.name)} <span class="m-qty">${expoEsc(r.spec)}（$${r.price}/${r.per || 'kg'}）</span>`, `$${r.subtotal.toLocaleString()}`)).join('') +
     o.extras.map(x => line(`${expoEsc(x.name)} <span class="m-qty">${x.kg}KG（$${x.price}/kg）</span>`, `$${x.subtotal.toLocaleString()}`)).join('') +
     line(o.island ? '運費（離島配送）' : '運費', o.islandQuote ? '另行報價' : (o.shipping ? `$${o.shipping.toLocaleString()}` : '免運')) +
     (o.gifts.length ? `<div class="modal-note">滿額贈品：${o.gifts.map(expoEsc).join('、')}</div>` : '');
@@ -110,7 +122,10 @@ async function confirmExpoPay() {
       qty: 1, price: total, subtotal: total,
       category: '訂購單', payment: selectedPayment, invoice,
     });
+    sales.push(...fruitStockLines(rec, rec.no, 1));
     saveSales();
+    recomputeRemaining();
+    refresh();
     updateStats();
     closeCheckout();
     showToast('已確認付款', 'success');
@@ -150,9 +165,26 @@ async function voidExpoOrder(no) {
       qty: 1, price: -rec.total, subtotal: -rec.total,
       category: '訂購單', payment: rec.paid.method, invoice: '',
     });
+    sales.push(...fruitStockLines(rec, `${no}-作廢`, -1));
     saveSales();
+    recomputeRemaining();
+    refresh();
     updateStats();
     showToast('已作廢，業務可以複製成新單', 'success');
+  } catch (e) {
+    console.error(e);
+    showToast(syncErrorText(e), 'warn');
+  }
+}
+
+/** 刪除還沒付款的單：清單不再顯示，雲端留紀錄（按錯還救得回來） */
+async function deleteExpoOrder(no) {
+  const rec = expoOrders.find(o => o.no === no);
+  if (!rec) return;
+  if (!confirm(`確定刪除 ${no}（${rec.name}，$${Number(rec.total).toLocaleString()}）？\n刪除後請業務重新填單。`)) return;
+  try {
+    await Sync.remove(no);
+    showToast('已刪除訂單', 'success');
   } catch (e) {
     console.error(e);
     showToast(syncErrorText(e), 'warn');
@@ -183,9 +215,11 @@ function initExpo() {
   });
   $('#expoList').addEventListener('click', e => {
     const pay = e.target.closest('[data-expopay]');
-    const del = e.target.closest('[data-expovoid]');
+    const voidBtn = e.target.closest('[data-expovoid]');
+    const del = e.target.closest('[data-expodel]');
     if (pay) openExpoCheckout(pay.dataset.expopay);
-    if (del) voidExpoOrder(del.dataset.expovoid);
+    if (voidBtn) voidExpoOrder(voidBtn.dataset.expovoid);
+    if (del) deleteExpoOrder(del.dataset.expodel);
   });
   $('#expoLogin').addEventListener('submit', async e => {
     e.preventDefault();
