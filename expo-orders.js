@@ -61,6 +61,7 @@ function renderExpoList() {
         <span class="ord-inv">${o.status === 'paid' ? `${expoEsc(o.paid.method)}${o.paid.invoice ? '　發票 ' + expoEsc(o.paid.invoice) : ''}` : expoEsc(o.returnReason || o.voidReason || '')}</span>
         <div class="ord-actions">
           ${['pending', 'returned', 'cancelled'].includes(o.status) ? `<button class="btn-sm danger-text" data-expodel="${expoEsc(o.no)}">刪除訂單</button>` : ''}
+          ${o.status === 'pending' ? `<button class="btn-sm danger-text" data-exporeturn="${expoEsc(o.no)}">退回業務</button>` : ''}
           ${o.status === 'pending' ? `<button class="btn-sm" data-expopay="${expoEsc(o.no)}">結帳</button>` : ''}
           ${o.status === 'paid' ? `<button class="btn-sm danger-text" data-expovoid="${expoEsc(o.no)}">作廢</button>` : ''}
         </div>
@@ -134,9 +135,11 @@ async function confirmExpoPay() {
   btn.disabled = false;
 }
 
-async function returnExpoOrder() {
-  const { rec } = expoPay;
-  const reason = prompt('退回原因（業務會看到）：', '金額有誤，請確認');
+/** 退回業務：清單卡片上直接按（帶編號），或在結帳視窗裡按（用視窗那張單） */
+async function returnExpoOrder(no) {
+  const rec = no ? expoOrders.find(o => o.no === no) : expoPay && expoPay.rec;
+  if (!rec) return;
+  const reason = prompt(`退回 ${rec.no}（${rec.name}）給業務修改。\n退回原因（業務會看到）：`, '金額有誤，請確認');
   if (reason === null) return;
   try {
     await Sync.giveBack(rec.no, rec.version, reason.trim());
@@ -145,7 +148,7 @@ async function returnExpoOrder() {
     console.error(e);
     showToast(syncErrorText(e), 'warn');
   }
-  closeCheckout();
+  if (!no) closeCheckout();
 }
 
 /** 作廢已付款的單：雲端標記作廢，本機補一筆負金額，退款紀錄留在 CSV */
@@ -215,6 +218,8 @@ function initExpo() {
     const pay = e.target.closest('[data-expopay]');
     const voidBtn = e.target.closest('[data-expovoid]');
     const del = e.target.closest('[data-expodel]');
+    const back = e.target.closest('[data-exporeturn]');
+    if (back) returnExpoOrder(back.dataset.exporeturn);
     if (pay) openExpoCheckout(pay.dataset.expopay);
     if (voidBtn) voidExpoOrder(voidBtn.dataset.expovoid);
     if (del) deleteExpoOrder(del.dataset.expodel);
