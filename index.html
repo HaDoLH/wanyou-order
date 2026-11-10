@@ -54,6 +54,7 @@
       <button class="btn-sm" id="priceEditBtn">改價</button>
       <button class="btn-sm" id="ordersBtn">訂單紀錄</button>
       <button class="btn-sm" id="importBtn">匯入商品</button>
+      <button class="btn-sm" id="reseedBtn" title="直接載入 App 內建的最新商品清單，免傳檔">載入最新商品</button>
       <button class="btn-sm" id="exportBtn">匯出 CSV</button>
       <button class="btn-sm danger-text" id="newDayBtn">開新的一天</button>
       <!-- 匯入商品用的隱藏檔案選擇器 -->
@@ -967,6 +968,18 @@
     reader.readAsText(file, 'utf-8');
   }
 
+  // 一鍵載入 App 內建的最新商品清單（免傳檔）。換展覽、或舊平板商品沒換到時用。
+  function loadLatestProducts(){
+    if(!confirm('載入最新商品清單？\n\n• 用 App 內建的最新商品「取代」目前清單（換展覽、清掉舊商品）\n• 庫存會回到預設數量，之後可用「庫存修改」調整\n• 已記錄的訂單不受影響')){
+      return;
+    }
+    products = DEFAULT_PRODUCTS.map(p => ({ ...p }));
+    saveProducts();
+    recomputeRemaining();
+    refresh();
+    showToast(`已載入最新商品（${products.length} 項）`, 'success');
+  }
+
   function newDay(){
     if(!confirm('開新的一天？\n• 會先把今天的訂單自動匯出成 CSV 備份\n• 庫存「沿用」目前剩餘（不會回滿）\n• 清空今日訂單，筆數/營收歸零')){
       return;
@@ -1432,6 +1445,7 @@
       if(file) importProductsCSV(file);
       e.target.value = '';   // 清掉，才能再次選同一個檔
     });
+    $('#reseedBtn').addEventListener('click', loadLatestProducts);
 
     // 補貨彈窗
     $('#restockBtn').addEventListener('click', openRestock);
