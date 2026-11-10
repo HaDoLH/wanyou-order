@@ -350,7 +350,7 @@
     { id:'m-coaster-rainbow', cat:'merch', name:'壓克力杯墊-炫彩', price:99,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
     { id:'m-coaster-orange',  cat:'merch', name:'壓克力杯墊-橘',   price:99,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
     { id:'m-bag',             cat:'merch', name:'杜邦紙購物袋',     price:279, unit:'個', stock:58,  lowAt:5 },
-    { id:'m-pouch',           cat:'merch', name:'迷你收納包',       price:89,  unit:'個', stock:200, lowAt:10, note:'搭配任1商品加購價 $69（自動折）' },
+    { id:'m-pouch',           cat:'merch', name:'迷你收納包',       price:89,  unit:'個', stock:200, lowAt:10, note:'有買其他現場商品，加購一律 $69（自動折）' },
     // 品飲杯：畫面上合成一張卡，按了再選顏色
     { id:'m-cup-white',       cat:'merch', name:'咖啡品飲杯-白',   price:150, unit:'個', stock:50,  lowAt:5, group:'cup' },
     { id:'m-cup-green',       cat:'merch', name:'咖啡品飲杯-綠',   price:150, unit:'個', stock:50,  lowAt:5, group:'cup' },
@@ -367,11 +367,15 @@
   /* 周邊頁的三張「贈送」卡：點了選品項＋數量（$0，記在銷售紀錄的類別欄） */
   const GIFT_SETS = {
     '滿額贈品': ['m-pouch', 'm-bag'],
-    '扭蛋贈品': ['beans1kg', 'cup-any', 'coaster-any'],
-    '業務贈送': ['m-pouch', 'cup-any', 'coaster-any', 'm-bag'],
+    '扭蛋贈品': ['beans1kg', 'cup', 'coaster'],
+    '業務贈送': ['m-pouch', 'cup', 'coaster', 'm-bag'],
   };
-  // 不綁色的品飲杯／杯墊：只記數量，不扣某個顏色的庫存
-  const ANY_ITEMS = { 'cup-any':'咖啡品飲杯（不綁色）', 'coaster-any':'壓克力杯墊（不綁色）' };
+  // 贈送選單裡要「再選一層」的項目：生豆1KG 選哪支豆、品飲杯／杯墊選顏色（扣該品項庫存）
+  const GIFT_PICK = {
+    beans1kg: { label:'生豆1KG',    subTitle:'選擇哪一支生豆', ids: () => products.filter(p => p.cat === '1kg' && p.unit !== '杯').map(p => p.id) },
+    cup:      { label:'咖啡品飲杯', subTitle:'選擇顏色',       ids: () => ['m-cup-white', 'm-cup-green'] },
+    coaster:  { label:'壓克力杯墊', subTitle:'選擇顏色',       ids: () => [...COASTER_89, ...COASTER_99] },
+  };
 
   // localStorage 的鍵名（資料就存在這幾個「抽屜」裡）
   const KEY_PRODUCTS = 'wy_products';        // 商品＋庫存總量
@@ -524,13 +528,11 @@
     const cups = Math.min(n['m-cup-white'] || 0, n['m-cup-green'] || 0);
     const cupOff = priceOf('m-cup-white') + priceOf('m-cup-green') - CUP_PAIR_PRICE;
     if(cups && cupOff > 0) list.push({ name:`品飲杯白＋綠一組 $${CUP_PAIR_PRICE}`, qty:cups, amount:cups * cupOff });
-    // 收納包：每搭配 1 件其他付費商品，可以 1 個用加購價
+    // 收納包：只要同一筆有買其他現場商品，加購幾個都是加購價
     const pouch = n['m-pouch'] || 0;
     if(pouch){
-      const others = Object.values(cart)
-        .filter(l => (l.reason === '銷售' || l.reason === '預購') && l.id !== 'm-pouch')
-        .reduce((s, l) => s + l.qty, 0);
-      const k = Math.min(pouch, others);
+      const hasOther = Object.values(cart).some(l => l.reason === '銷售' && l.id !== 'm-pouch');
+      const k = hasOther ? pouch : 0;
       const off = priceOf('m-pouch') - POUCH_ADDON_PRICE;
       if(k && off > 0) list.push({ name:`迷你收納包加購價 $${POUCH_ADDON_PRICE}`, qty:k, amount:k * off });
     }
@@ -691,8 +693,7 @@
 
   // 贈送選單上的品名（不綁色、生豆1KG 是特別項目）
   function giftLabel(id){
-    if(id === 'beans1kg') return '生豆1KG';
-    if(ANY_ITEMS[id]) return ANY_ITEMS[id].replace('壓克力', '').replace('咖啡', '');
+    if(GIFT_PICK[id]) return GIFT_PICK[id].label;
     const p = products.find(x => x.id === id);
     return p ? p.name : id;
   }
@@ -854,6 +855,7 @@
     const t = choice.options.find(o => o.value === choice.top);
     const hasSub = !!(t && t.sub);
     $('#choiceSub').hidden = $('#choiceSubTitle').hidden = !hasSub;
+    if(hasSub) $('#choiceSubTitle').textContent = t.subTitle || '';
     $('#choiceSub').innerHTML = hasSub ? t.sub.map(o => btn(o, 'data-subv', o.value === choice.value)).join('') : '';
     $('#choiceQty').textContent = choice.qty;
     $('#choiceOk').disabled = !choice.value;
@@ -870,9 +872,12 @@
   // 周邊頁的贈送卡：滿額贈品／扭蛋贈品／業務贈送
   function openGiftSet(reason){
     const options = GIFT_SETS[reason].map(id => {
-      if(id === 'beans1kg') return { value:'beans1kg', label:'生豆1KG',
-        sub: products.filter(p => p.cat === '1kg' && p.unit !== '杯').map(p => stockOption(p.id)) };
-      if(ANY_ITEMS[id]) return { value:id, label:ANY_ITEMS[id] };
+      const g = GIFT_PICK[id];
+      if(g){
+        const many = id !== 'beans1kg';   // 杯／杯墊的選項只顯示顏色
+        return { value:id, label:g.label, subTitle:g.subTitle,
+          sub: g.ids().map(pid => stockOption(pid, many ? products.find(p => p.id === pid)?.name.split('-').pop() : undefined)) };
+      }
       return stockOption(id);
     });
     openChoice({ title:reason, sub:'選擇品項與數量（不收費）', options,
@@ -892,15 +897,9 @@
       } });
   }
 
-  // 加一行贈送（$0）。不綁色的只記數量；其他扣該商品庫存
+  // 加一行贈送（$0），扣該商品庫存
   function addGiftLine(id, reason, qty){
     const key = id + '|' + reason;
-    if(ANY_ITEMS[id]){
-      if(cart[key]) cart[key].qty += qty;
-      else cart[key] = { id, qty, reason, custom:true, gift:true, name:ANY_ITEMS[id], price:0 };
-      refresh();
-      return true;
-    }
     const p = products.find(x => x.id === id);
     if(!p) return false;
     if(availableStock(p) < qty){ showToast(`${p.name} 只剩 ${availableStock(p)} 個`, 'warn'); return false; }
