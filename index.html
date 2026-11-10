@@ -336,7 +336,7 @@
     { id:'21090147', cat:'500g', name:'玻利維亞 伊莎貝爾莊園 競標批次 藝妓 水洗 #Tunki ISA03', price:3100, unit:'盒', stock:7, lowAt:3 },
     { id:'21090157', cat:'500g', name:'英國 聖海倫娜 樹籬竹木莊園 水洗', price:2660, unit:'盒', stock:40, lowAt:3 },
     // 特調飲品（現場販售、限量；庫存為暫定值，每天用「庫存修改」改成當日杯數）
-    { id:'drink-fizz', cat:'1kg', name:'水果特調氣泡咖啡', price:150, unit:'杯', stock:30, lowAt:5 },
+    { id:'drink-fizz', cat:'1kg', name:'水果特調氣泡咖啡', price:120, unit:'杯', stock:30, lowAt:5 },
     // 水果特調：只看庫存（KG），庫存用「庫存修改」補；客人在訂購單訂購，櫃台付款時自動扣
     { id:'21015970', cat:'fruit', name:'哥倫比亞 水果特調系列 蜜瓜莫西托 Melon Mojito', price:0, unit:'KG', stock:0, lowAt:0 },
     { id:'21015971', cat:'fruit', name:'哥倫比亞 水果特調系列 百香果莫西托 Passionfruit Mojito', price:0, unit:'KG', stock:0, lowAt:0 },
@@ -350,7 +350,7 @@
     { id:'m-coaster-rainbow', cat:'merch', name:'壓克力杯墊-炫彩', price:99,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
     { id:'m-coaster-orange',  cat:'merch', name:'壓克力杯墊-橘',   price:99,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
     { id:'m-bag',             cat:'merch', name:'杜邦紙購物袋',     price:279, unit:'個', stock:58,  lowAt:5 },
-    { id:'m-pouch',           cat:'merch', name:'迷你收納包',       price:89,  unit:'個', stock:200, lowAt:10, note:'有買其他現場商品，加購一律 $69（自動折）' },
+    { id:'m-pouch',           cat:'merch', name:'迷你收納包',       price:89,  unit:'個', stock:200, lowAt:10, note:'第2個起 $69；有買其他現場商品全部 $69（自動折）' },
     // 品飲杯：畫面上合成一張卡，按了再選顏色
     { id:'m-cup-white',       cat:'merch', name:'咖啡品飲杯-白',   price:150, unit:'個', stock:50,  lowAt:5, group:'cup' },
     { id:'m-cup-green',       cat:'merch', name:'咖啡品飲杯-綠',   price:150, unit:'個', stock:50,  lowAt:5, group:'cup' },
@@ -370,9 +370,15 @@
     '扭蛋贈品': ['beans1kg', 'cup', 'coaster'],
     '業務贈送': ['m-pouch', 'cup', 'coaster', 'm-bag'],
   };
+  // 扭蛋的生豆1KG：只有這兩支，整個展期各 2 包（共 4 包），一天只送 1 包
+  const GACHA_BEANS = { '21080485':2, '21080483':2 };   // 風信子 日曬／水洗
+  const GACHA_PER_DAY = 1;
+  const KEY_GACHA = 'wy_gacha_beans';   // 扭蛋生豆送出紀錄（開新的一天不會清掉，才算得出整個展期）
+  const GACHA_FROM = new Date(2026, 10, 13).getTime();   // 展期 11/13 起才算進「各 2 包」，展前測試不佔額度
+
   // 贈送選單裡要「再選一層」的項目：生豆1KG 選哪支豆、品飲杯／杯墊選顏色（扣該品項庫存）
   const GIFT_PICK = {
-    beans1kg: { label:'生豆1KG',    subTitle:'選擇哪一支生豆', ids: () => products.filter(p => p.cat === '1kg' && p.unit !== '杯').map(p => p.id) },
+    beans1kg: { label:'生豆1KG',    subTitle:'選擇哪一支生豆（一天 1 包）', ids: () => Object.keys(GACHA_BEANS) },
     cup:      { label:'咖啡品飲杯', subTitle:'選擇顏色',       ids: () => ['m-cup-white', 'm-cup-green'] },
     coaster:  { label:'壓克力杯墊', subTitle:'選擇顏色',       ids: () => [...COASTER_89, ...COASTER_99] },
   };
@@ -384,7 +390,7 @@
   const KEY_INV_NO     = 'wy_invoice_no';    // 發票下一個後段號碼（含前導 0）
   const KEY_ADJUST     = 'wy_adjust';        // 庫存調整紀錄（現場修改庫存＋原因）
   const KEY_PRODUCTS_VER = 'wy_products_ver'; // 商品資料版本（分頁改版時用來搬家）
-  const PRODUCTS_VERSION = 3;                 // 2 = 分成 1KG／500G／贈品／水果特調；3 = 贈品改周邊、1KG 正確庫存
+  const PRODUCTS_VERSION = 4;                 // 2 = 分成 1KG／500G／贈品／水果特調；3 = 贈品改周邊、1KG 正確庫存；4 = 氣泡咖啡 $120
 
   /* ============================================================
      ② 程式狀態（資料）—— 改資料 → 存檔 → 重畫畫面
@@ -453,6 +459,10 @@
           before, after, delta: after - before, reason: '台北展正確庫存（系統更新）' });
       });
       saveAdjustments();
+    }
+    if(ver < 4){
+      const drink = products.find(p => p.id === 'drink-fizz');
+      if(drink) drink.price = 120;   // 水果特調氣泡咖啡改 $120
     }
     saveProducts();
     localStorage.setItem(KEY_PRODUCTS_VER, String(PRODUCTS_VERSION));
@@ -528,11 +538,11 @@
     const cups = Math.min(n['m-cup-white'] || 0, n['m-cup-green'] || 0);
     const cupOff = priceOf('m-cup-white') + priceOf('m-cup-green') - CUP_PAIR_PRICE;
     if(cups && cupOff > 0) list.push({ name:`品飲杯白＋綠一組 $${CUP_PAIR_PRICE}`, qty:cups, amount:cups * cupOff });
-    // 收納包：只要同一筆有買其他現場商品，加購幾個都是加購價
+    // 收納包：同一筆有買其他現場商品 → 全部加購價；只買收納包 → 第 1 個原價，第 2 個起加購價
     const pouch = n['m-pouch'] || 0;
     if(pouch){
       const hasOther = Object.values(cart).some(l => l.reason === '銷售' && l.id !== 'm-pouch');
-      const k = hasOther ? pouch : 0;
+      const k = hasOther ? pouch : pouch - 1;
       const off = priceOf('m-pouch') - POUCH_ADDON_PRICE;
       if(k && off > 0) list.push({ name:`迷你收納包加購價 $${POUCH_ADDON_PRICE}`, qty:k, amount:k * off });
     }
@@ -874,9 +884,9 @@
     const options = GIFT_SETS[reason].map(id => {
       const g = GIFT_PICK[id];
       if(g){
-        const many = id !== 'beans1kg';   // 杯／杯墊的選項只顯示顏色
-        return { value:id, label:g.label, subTitle:g.subTitle,
-          sub: g.ids().map(pid => stockOption(pid, many ? products.find(p => p.id === pid)?.name.split('-').pop() : undefined)) };
+        const sub = id === 'beans1kg' ? g.ids().map(gachaOption)   // 扭蛋生豆：顯示扭蛋剩幾包、今天送過沒
+          : g.ids().map(pid => stockOption(pid, products.find(p => p.id === pid)?.name.split('-').pop()));   // 杯／杯墊只顯示顏色
+        return { value:id, label:g.label, subTitle:g.subTitle, sub };
       }
       return stockOption(id);
     });
@@ -897,11 +907,38 @@
       } });
   }
 
+  /* 扭蛋生豆：已送出的紀錄（含購物車裡還沒結帳的） */
+  function loadGacha(){ try{ return JSON.parse(localStorage.getItem(KEY_GACHA)) || []; }catch(e){ return []; } }
+  function saveGacha(list){ localStorage.setItem(KEY_GACHA, JSON.stringify(list)); }
+  const todayKey = () => new Date().toLocaleDateString('zh-TW');
+  function gachaCount(){
+    const log = loadGacha();
+    const inCart = Object.values(cart).filter(l => l.reason === '扭蛋贈品' && GACHA_BEANS[l.id]);
+    const today = log.filter(g => g.date === todayKey()).reduce((s, g) => s + g.qty, 0)
+      + inCart.reduce((s, l) => s + l.qty, 0);
+    const used = id => log.filter(g => g.id === id && (g.ts || 0) >= GACHA_FROM).reduce((s, g) => s + g.qty, 0)
+      + inCart.filter(l => l.id === id).reduce((s, l) => s + l.qty, 0);
+    return { today, used };
+  }
+  function gachaOption(id){
+    const p = products.find(x => x.id === id);
+    const { today, used } = gachaCount();
+    const left = GACHA_BEANS[id] - used(id);
+    const name = p ? p.name.replace('衣索比亞 谷吉 烏拉嘎 ', '') : id;
+    if(today >= GACHA_PER_DAY) return { value:id, label:`${name}（今天已送）`, disabled:true };
+    return { value:id, label:`${name}（扭蛋剩 ${left} 包）`, disabled: left <= 0 || !p || availableStock(p) <= 0 };
+  }
+
   // 加一行贈送（$0），扣該商品庫存
   function addGiftLine(id, reason, qty){
     const key = id + '|' + reason;
     const p = products.find(x => x.id === id);
     if(!p) return false;
+    if(reason === '扭蛋贈品' && GACHA_BEANS[id]){
+      const { today, used } = gachaCount();
+      if(today + qty > GACHA_PER_DAY){ showToast(`扭蛋生豆一天只送 ${GACHA_PER_DAY} 包`, 'warn'); return false; }
+      if(used(id) + qty > GACHA_BEANS[id]){ showToast(`${p.name} 扭蛋只剩 ${GACHA_BEANS[id] - used(id)} 包`, 'warn'); return false; }
+    }
     if(availableStock(p) < qty){ showToast(`${p.name} 只剩 ${availableStock(p)} 個`, 'warn'); return false; }
     if(cart[key]) cart[key].qty += qty;
     else cart[key] = { id, qty, reason };
@@ -1100,6 +1137,8 @@
       });
     }
     saveSales();
+    const gacha = Object.values(cart).filter(l => l.reason === '扭蛋贈品' && GACHA_BEANS[l.id]);
+    if(gacha.length) saveGacha([...loadGacha(), ...gacha.map(l => ({ date: todayKey(), ts: Date.now(), id: l.id, qty: l.qty, orderNo }))]);
     recomputeRemaining();
     cart = {};
     closeCheckout();
@@ -1507,6 +1546,7 @@
     }
     sales = sales.filter(s => s.orderNo !== orderNo);
     saveSales();
+    saveGacha(loadGacha().filter(g => g.orderNo !== orderNo));   // 扭蛋生豆的次數也還回去
     recomputeRemaining();   // 賣出數量減少 → 剩餘自動加回
     refresh();
     updateStats();
