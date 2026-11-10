@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet" />
 
   <!-- 樣式表。改 CSS 後把 ?v= 數字加一，強迫瀏覽器抓新版（破快取） -->
-  <link rel="stylesheet" href="style.css?v=14" />
+  <link rel="stylesheet" href="style.css?v=15" />
 </head>
 <body>
 
@@ -70,7 +70,7 @@
       <div class="tabs" id="tabs">
         <button class="tab active" data-cat="1kg">1KG生豆</button>
         <button class="tab" data-cat="500g">500G生豆</button>
-        <button class="tab" data-cat="gift">贈品</button>
+        <button class="tab" data-cat="merch">周邊</button>
         <button class="tab" data-cat="fruit">水果特調</button>
       </div>
       <div class="products" id="products">
@@ -169,18 +169,25 @@
     </div>
   </div>
 
-  <!-- ============ 贈品「發放原因」選擇彈窗 ============ -->
+  <!-- ============ 選品項＋數量彈窗（周邊的贈送卡、品飲杯選顏色共用） ============ -->
   <div class="overlay" id="reasonOverlay">
     <div class="modal modal-reason">
-      <h2>選擇贈送原因</h2>
-      <div class="modal-sub" id="reasonProductName">—</div>
-      <div class="reason-options" id="reasonOptions">
-        <button class="btn reason-btn" data-reason="公關贈送">公關贈送</button>
-        <button class="btn reason-btn" data-reason="滿額贈">滿額贈</button>
-        <button class="btn reason-btn" data-reason="扭蛋獎品">扭蛋獎品</button>
+      <h2 id="choiceTitle">選擇</h2>
+      <div class="modal-sub" id="reasonProductName"></div>
+      <div class="reason-options" id="reasonOptions"></div>
+      <div class="modal-sub" id="choiceSubTitle" hidden>選擇哪一支生豆</div>
+      <div class="reason-options" id="choiceSub" hidden></div>
+      <div class="choice-qty">
+        <span>數量</span>
+        <div class="stepper">
+          <button type="button" id="choiceDec">－</button>
+          <span class="qty" id="choiceQty">1</span>
+          <button type="button" id="choiceInc">＋</button>
+        </div>
       </div>
       <div class="modal-actions">
         <button class="btn secondary" id="reasonCancel">取消</button>
+        <button class="btn primary" id="choiceOk" disabled>確定</button>
       </div>
     </div>
   </div>
@@ -302,7 +309,7 @@
 
   // 贈送原因（贈品用）。※ 目前實際按鈕寫在下方 HTML 的 #reasonOptions，
   //   這份常數僅作對照參考；如要增減原因，兩邊要一起改才會生效。
-  const GIFT_REASONS = ['公關贈送', '滿額贈', '扭蛋獎品'];
+  const GIFT_REASONS = ['滿額贈品', '扭蛋贈品', '業務贈送'];
 
   // 付款方式（結帳按鈕、付款總額、改付款方式都用這份；要加減方式改這裡）
   const PAYMENT_METHODS = ['付現', '刷卡', 'LINE Pay', '匯款'];
@@ -314,9 +321,9 @@
   //   cat:'fruit' = 水果特調（只看庫存，單位 KG；訂購單付款時自動扣）
   const DEFAULT_PRODUCTS = [
     // 2026 台北咖啡展 · 1公斤款（1公斤真空／包）
-    { id:'21080483', cat:'1kg', name:'衣索比亞 谷吉 烏拉嘎 風信子 水洗 G1', price:540, unit:'包', stock:90, lowAt:10 },
+    { id:'21080483', cat:'1kg', name:'衣索比亞 谷吉 烏拉嘎 風信子 水洗 G1', price:540, unit:'包', stock:120, lowAt:10 },
     { id:'21080485', cat:'1kg', name:'衣索比亞 谷吉 烏拉嘎 風信子 日曬 G1', price:560, unit:'包', stock:90, lowAt:10 },
-    { id:'21040879', cat:'1kg', name:'哥倫比亞 黑武士 厭氧日曬', price:550, unit:'包', stock:60, lowAt:10 },
+    { id:'21040879', cat:'1kg', name:'哥倫比亞 黑武士 厭氧日曬', price:550, unit:'包', stock:30, lowAt:10 },
     { id:'21040869', cat:'1kg', name:'肯亞 麒麟雅加 加古悠處理廠 AA TOP 水洗', price:510, unit:'包', stock:60, lowAt:10 },
     { id:'21080481', cat:'1kg', name:'衣索比亞 西達馬 班莎 龐貝 日曬 G1', price:520, unit:'包', stock:60, lowAt:10 },
     // 高單價小包裝（500g／250g；多為「包」，僅 #Tunki ISA03 與聖海倫娜為「盒」）
@@ -336,8 +343,35 @@
     { id:'21015972', cat:'fruit', name:'哥倫比亞 水果特調系列 草莓莫西托 Strawberry Mojito', price:0, unit:'KG', stock:0, lowAt:0 },
     { id:'21015973', cat:'fruit', name:'哥倫比亞 水果特調系列 櫻桃莫西托 Cherry Mojito', price:0, unit:'KG', stock:0, lowAt:0 },
     { id:'21015974', cat:'fruit', name:'哥倫比亞 水果特調系列 藍莓莫西托 Blueberry Mojito', price:0, unit:'KG', stock:0, lowAt:0 },
-    // 贈品：台北展清單待定，之後補上（發放時選原因：公關贈送／滿額贈／扭蛋獎品）
+    // 周邊：可販售（組合價、加購價在購物車自動折）；
+    //   也可以從「滿額贈品／扭蛋贈品／業務贈送」卡片送出（$0），扣的是同一份庫存
+    { id:'m-coaster-blue',    cat:'merch', name:'壓克力杯墊-藍',   price:89,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
+    { id:'m-coaster-green',   cat:'merch', name:'壓克力杯墊-綠',   price:89,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
+    { id:'m-coaster-rainbow', cat:'merch', name:'壓克力杯墊-炫彩', price:99,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
+    { id:'m-coaster-orange',  cat:'merch', name:'壓克力杯墊-橘',   price:99,  unit:'個', stock:30,  lowAt:5, note:'$89＋$99 一組 $160・四色各1 一組 $300（自動折）' },
+    { id:'m-bag',             cat:'merch', name:'杜邦紙購物袋',     price:279, unit:'個', stock:58,  lowAt:5 },
+    { id:'m-pouch',           cat:'merch', name:'迷你收納包',       price:89,  unit:'個', stock:200, lowAt:10, note:'搭配任1商品加購價 $69（自動折）' },
+    // 品飲杯：畫面上合成一張卡，按了再選顏色
+    { id:'m-cup-white',       cat:'merch', name:'咖啡品飲杯-白',   price:150, unit:'個', stock:50,  lowAt:5, group:'cup' },
+    { id:'m-cup-green',       cat:'merch', name:'咖啡品飲杯-綠',   price:150, unit:'個', stock:50,  lowAt:5, group:'cup' },
   ];
+
+  /* 組合價／加購價（購物車自動折抵；折扣金額依「目前售價」算，改價後也正確） */
+  const COASTER_89 = ['m-coaster-blue', 'm-coaster-green'];
+  const COASTER_99 = ['m-coaster-rainbow', 'm-coaster-orange'];
+  const COASTER_PAIR_PRICE = 160;   // $89＋$99 一組
+  const COASTER_SET4_PRICE = 300;   // 四色各 1 一組
+  const CUP_PAIR_PRICE = 269;       // 白＋綠一組
+  const POUCH_ADDON_PRICE = 69;     // 搭配任 1 商品加購
+
+  /* 周邊頁的三張「贈送」卡：點了選品項＋數量（$0，記在銷售紀錄的類別欄） */
+  const GIFT_SETS = {
+    '滿額贈品': ['m-pouch', 'm-bag'],
+    '扭蛋贈品': ['beans1kg', 'cup-any', 'coaster-any'],
+    '業務贈送': ['m-pouch', 'cup-any', 'coaster-any', 'm-bag'],
+  };
+  // 不綁色的品飲杯／杯墊：只記數量，不扣某個顏色的庫存
+  const ANY_ITEMS = { 'cup-any':'咖啡品飲杯（不綁色）', 'coaster-any':'壓克力杯墊（不綁色）' };
 
   // localStorage 的鍵名（資料就存在這幾個「抽屜」裡）
   const KEY_PRODUCTS = 'wy_products';        // 商品＋庫存總量
@@ -346,7 +380,7 @@
   const KEY_INV_NO     = 'wy_invoice_no';    // 發票下一個後段號碼（含前導 0）
   const KEY_ADJUST     = 'wy_adjust';        // 庫存調整紀錄（現場修改庫存＋原因）
   const KEY_PRODUCTS_VER = 'wy_products_ver'; // 商品資料版本（分頁改版時用來搬家）
-  const PRODUCTS_VERSION = 2;                 // 2 = 分成 1KG／500G／贈品／水果特調
+  const PRODUCTS_VERSION = 3;                 // 2 = 分成 1KG／500G／贈品／水果特調；3 = 贈品改周邊、1KG 正確庫存
 
   /* ============================================================
      ② 程式狀態（資料）—— 改資料 → 存檔 → 重畫畫面
@@ -379,20 +413,43 @@
       products = DEFAULT_PRODUCTS.map(p => ({ ...p }));
       saveProducts();
     }
-    migrateProducts();
   }
 
-  // 平板上的商品是舊版分類（beans）時搬家：只改分類、補上水果特調，
-  // 價格、庫存、改過的價都保留
+  // 1KG 生豆台北展正確庫存（11/10 使用者提供）
+  const STOCK_V3 = { '21080483':120, '21080485':90, '21040879':30, '21040869':60, '21080481':60 };
+
+  // 平板上的商品資料版本較舊時搬家（要在讀完銷售紀錄後執行，才算得出已賣數量）
+  //   v2：舊分類 beans → 1kg/500g，補上水果特調；價格、庫存、改過的價都保留
+  //   v3：拿掉舊「贈品」、補上周邊商品；1KG 生豆改成正確庫存（已賣數量不動，留調整紀錄）
   function migrateProducts(){
-    if(Number(localStorage.getItem(KEY_PRODUCTS_VER)) >= PRODUCTS_VERSION) return;
-    const seedCat = {};
-    DEFAULT_PRODUCTS.forEach(d => { seedCat[d.id] = d.cat; });
-    products.forEach(p => {
-      if(p.cat === 'beans') p.cat = seedCat[p.id] && seedCat[p.id] !== 'gift' ? seedCat[p.id] : '1kg';
-    });
-    DEFAULT_PRODUCTS.filter(d => d.cat === 'fruit' && !products.some(p => p.id === d.id))
-      .forEach(d => products.push({ ...d }));
+    const ver = Number(localStorage.getItem(KEY_PRODUCTS_VER)) || 0;
+    if(ver >= PRODUCTS_VERSION) return;
+    if(ver < 2){
+      const seedCat = {};
+      DEFAULT_PRODUCTS.forEach(d => { seedCat[d.id] = d.cat; });
+      products.forEach(p => {
+        if(p.cat === 'beans') p.cat = seedCat[p.id] && seedCat[p.id] !== 'gift' ? seedCat[p.id] : '1kg';
+      });
+      DEFAULT_PRODUCTS.filter(d => d.cat === 'fruit' && !products.some(p => p.id === d.id))
+        .forEach(d => products.push({ ...d }));
+    }
+    if(ver < 3){
+      products = products.filter(p => p.cat !== 'gift');
+      DEFAULT_PRODUCTS.filter(d => d.cat === 'merch' && !products.some(p => p.id === d.id))
+        .forEach(d => products.push({ ...d }));
+      const sold = {};
+      sales.forEach(s => { sold[s.id] = (sold[s.id] || 0) + Number(s.qty); });
+      const timeStr = new Date().toLocaleString('zh-TW', { hour12:false });
+      products.forEach(p => {
+        if(STOCK_V3[p.id] === undefined) return;
+        const before = Math.max(0, Number(p.stock) - (sold[p.id] || 0));
+        const after = STOCK_V3[p.id];
+        p.stock = after + (sold[p.id] || 0);       // 剩餘 = 正確庫存
+        if(before !== after) adjustments.push({ time: timeStr, id: p.id, name: p.name,
+          before, after, delta: after - before, reason: '台北展正確庫存（系統更新）' });
+      });
+      saveAdjustments();
+    }
     saveProducts();
     localStorage.setItem(KEY_PRODUCTS_VER, String(PRODUCTS_VERSION));
   }
@@ -424,6 +481,7 @@
     loadProducts();
     loadSales();
     loadAdjustments();
+    migrateProducts();
     recomputeRemaining();
     bindEvents();
     refresh();
@@ -441,10 +499,42 @@
   //   一般商品 → 去 products 表查名稱與價格
   //   預購（自訂金額）→ 直接用這行自己帶的名稱與金額（不占庫存）
   function lineInfo(line){
-    if(line.custom) return { name:line.name, price:line.price, isGift:false, custom:true, product:null };
+    if(line.custom) return { name:line.name, price:line.price, isGift:!!line.gift, custom:true, product:null };
     const p = products.find(x => x.id === line.id);
     if(!p) return null;
-    return { name:p.name, price:p.price, isGift:isGift(p), custom:false, product:p };
+    // 周邊用「滿額贈品／扭蛋贈品／業務贈送」送出時，同一個商品算 $0
+    const gift = isGift(p) || GIFT_REASONS.includes(line.reason);
+    return { name:p.name, price: gift ? 0 : p.price, isGift:gift, custom:false, product:p };
+  }
+
+  // 購物車自動折抵：杯墊組合、品飲杯白＋綠、收納包加購價（只算「銷售」的行，贈送的不算）
+  function priceOf(id){ const p = products.find(x => x.id === id); return p ? Number(p.price) : 0; }
+  function autoDiscounts(){
+    const n = {};
+    Object.values(cart).forEach(l => { if(l.reason === '銷售') n[l.id] = (n[l.id] || 0) + l.qty; });
+    const list = [];
+    const c = [...COASTER_89, ...COASTER_99].map(id => n[id] || 0);
+    // 先湊四色一組（省最多），剩下的再湊 $89＋$99
+    const set4 = Math.min(...c);
+    const set4Off = [...COASTER_89, ...COASTER_99].reduce((s, id) => s + priceOf(id), 0) - COASTER_SET4_PRICE;
+    if(set4 && set4Off > 0) list.push({ name:`杯墊四色一組 $${COASTER_SET4_PRICE}`, qty:set4, amount:set4 * set4Off });
+    const pair = Math.min(c[0] + c[1] - 2 * set4, c[2] + c[3] - 2 * set4);
+    const pairOff = priceOf(COASTER_89[0]) + priceOf(COASTER_99[0]) - COASTER_PAIR_PRICE;
+    if(pair > 0 && pairOff > 0) list.push({ name:`杯墊 $89＋$99 一組 $${COASTER_PAIR_PRICE}`, qty:pair, amount:pair * pairOff });
+    const cups = Math.min(n['m-cup-white'] || 0, n['m-cup-green'] || 0);
+    const cupOff = priceOf('m-cup-white') + priceOf('m-cup-green') - CUP_PAIR_PRICE;
+    if(cups && cupOff > 0) list.push({ name:`品飲杯白＋綠一組 $${CUP_PAIR_PRICE}`, qty:cups, amount:cups * cupOff });
+    // 收納包：每搭配 1 件其他付費商品，可以 1 個用加購價
+    const pouch = n['m-pouch'] || 0;
+    if(pouch){
+      const others = Object.values(cart)
+        .filter(l => (l.reason === '銷售' || l.reason === '預購') && l.id !== 'm-pouch')
+        .reduce((s, l) => s + l.qty, 0);
+      const k = Math.min(pouch, others);
+      const off = priceOf('m-pouch') - POUCH_ADDON_PRICE;
+      if(k && off > 0) list.push({ name:`迷你收納包加購價 $${POUCH_ADDON_PRICE}`, qty:k, amount:k * off });
+    }
+    return list;
   }
 
   // 某商品目前在購物車的總數（贈品可能分散在多個原因行，要全部加起來）
@@ -473,7 +563,15 @@
       return;
     }
 
+    const cupDone = {};
     list.forEach(p => {
+      // 同一組（品飲杯白／綠）只畫一張卡，按了再選顏色
+      if(p.group){
+        if(cupDone[p.group]) return;
+        cupDone[p.group] = true;
+        productsEl.appendChild(groupCard(list.filter(x => x.group === p.group)));
+        return;
+      }
       const out = availableStock(p) <= 0;
       const inCart = qtyInCartById(p.id);
 
@@ -523,11 +621,27 @@
       card.innerHTML = `
         <div class="name">${p.name}</div>
         ${priceHtml}
+        ${p.note ? `<div class="p-note">${p.note}</div>` : ''}
         ${stockHtml}
         <div class="card-action">${actionHtml}</div>
       `;
       productsEl.appendChild(card);
     });
+
+    // 周邊頁：三張贈送卡（選品項＋數量，$0）
+    if(currentCat === 'merch'){
+      GIFT_REASONS.forEach(reason => {
+        const card = document.createElement('div');
+        card.className = 'card preorder-card';
+        card.innerHTML = `
+          <div class="name">${reason}</div>
+          <div class="stock">${GIFT_SETS[reason].map(giftLabel).join('・')}</div>
+          <div class="card-action">
+            <button class="btn primary" data-giftset="${reason}">＋ 選擇</button>
+          </div>`;
+        productsEl.appendChild(card);
+      });
+    }
 
     // 1KG 分類底部：現場預購單專用「輸入金額」卡（開放金額，不占庫存）
     if(currentCat === '1kg'){
@@ -553,6 +667,34 @@
         <button class="btn primary" data-stockedit="1">＋ 修改</button>
       </div>`;
     productsEl.appendChild(se);
+  }
+
+  // 一組商品（品飲杯白／綠）合成一張卡
+  function groupCard(items){
+    const inCart = items.reduce((s, p) => s + Object.values(cart)
+      .filter(l => l.id === p.id && l.reason === '銷售').reduce((t, l) => t + l.qty, 0), 0);
+    const allOut = items.every(p => availableStock(p) <= 0);
+    const color = p => p.name.split('-').pop();
+    const card = document.createElement('div');
+    card.className = 'card' + (allOut && !inCart ? ' sold-out' : '');
+    card.innerHTML = `
+      <div class="name">${items[0].name.split('-')[0]}</div>
+      <div class="price">$${items[0].price} <small>/ ${items[0].unit || '個'}</small></div>
+      <div class="p-note">${color(items[0])}＋${color(items[1])}一組 $${CUP_PAIR_PRICE}（自動折）</div>
+      <div class="stock">${items.map(p => `${color(p)} 剩 ${p.remaining ?? 0}`).join('・')}</div>
+      <div class="card-action">
+        ${inCart ? `<div class="given-badge">已選 ${inCart} 個</div>` : ''}
+        <button class="btn primary" data-pickgroup="${items[0].group}" ${allOut ? 'disabled' : ''}>${allOut ? '售罄' : '＋ 選顏色'}</button>
+      </div>`;
+    return card;
+  }
+
+  // 贈送選單上的品名（不綁色、生豆1KG 是特別項目）
+  function giftLabel(id){
+    if(id === 'beans1kg') return '生豆1KG';
+    if(ANY_ITEMS[id]) return ANY_ITEMS[id].replace('壓克力', '').replace('咖啡', '');
+    const p = products.find(x => x.id === id);
+    return p ? p.name : id;
   }
 
   /* ============================================================
@@ -607,6 +749,15 @@
       cartLinesEl.appendChild(lineEl);
     });
 
+    // 自動折抵（組合價／加購價）
+    autoDiscounts().forEach(d => {
+      total -= d.amount;
+      const el = document.createElement('div');
+      el.className = 'cart-line bundle-line';
+      el.innerHTML = `<span class="c-name">${d.name} ×${d.qty}</span><span class="c-sub">−$${d.amount}</span>`;
+      cartLinesEl.appendChild(el);
+    });
+
     cartTotalEl.textContent = '$' + total.toLocaleString();
     miniEl.textContent = count + ' 件　$' + total.toLocaleString();
   }
@@ -616,10 +767,11 @@
 
   function cartTotalAmount(){
     if(expoPay) return expoPay.total;
-    return Object.values(cart).reduce((sum, line) => {
+    const sum = Object.values(cart).reduce((s, line) => {
       const info = lineInfo(line);
-      return sum + (info ? info.price * line.qty : 0);
+      return s + (info ? info.price * line.qty : 0);
     }, 0);
+    return sum - autoDiscounts().reduce((s, d) => s + d.amount, 0);
   }
 
   /* ============================================================
@@ -658,7 +810,7 @@
     const line = cart[key];
     if(!line) return;
     const p = products.find(x => x.id === line.id);
-    if(delta > 0 && availableStock(p) <= 0) return;
+    if(delta > 0 && p && availableStock(p) <= 0) return;   // 預購、不綁色贈品沒有庫存限制
     line.qty += delta;
     if(line.qty <= 0) delete cart[key];
     refresh();
@@ -678,20 +830,84 @@
   /* ============================================================
      ⑨ 贈品「發放原因」選擇彈窗
      ============================================================ */
-  function openReason(id){
+  // 彈窗狀態：{ title, sub, options:[{ value, label, disabled, sub:[…] }], top, value, qty, onOk(value, qty) }
+  let choice = null;
+
+  // 選項上顯示剩餘數量；沒庫存的不能選
+  function stockOption(id, label){
     const p = products.find(x => x.id === id);
-    if(!p || availableStock(p) <= 0) return;
-    pendingGiftId = id;
-    $('#reasonProductName').textContent = '發放：' + p.name;
+    if(!p) return { value:id, label, disabled:true };
+    const left = availableStock(p);
+    return { value:id, label:`${label || p.name}（剩 ${left}）`, disabled: left <= 0 };
+  }
+
+  function openChoice(cfg){
+    choice = { ...cfg, top:null, value:null, qty:1 };
+    paintChoice();
     $('#reasonOverlay').classList.add('show');
+  }
+  function paintChoice(){
+    $('#choiceTitle').textContent = choice.title;
+    $('#reasonProductName').textContent = choice.sub || '';
+    const btn = (o, attr, on) => `<button class="btn reason-btn${on ? ' current' : ''}" ${attr}="${o.value}" ${o.disabled ? 'disabled' : ''}>${o.label}</button>`;
+    $('#reasonOptions').innerHTML = choice.options.map(o => btn(o, 'data-top', o.value === choice.top)).join('');
+    const t = choice.options.find(o => o.value === choice.top);
+    const hasSub = !!(t && t.sub);
+    $('#choiceSub').hidden = $('#choiceSubTitle').hidden = !hasSub;
+    $('#choiceSub').innerHTML = hasSub ? t.sub.map(o => btn(o, 'data-subv', o.value === choice.value)).join('') : '';
+    $('#choiceQty').textContent = choice.qty;
+    $('#choiceOk').disabled = !choice.value;
   }
   function closeReason(){
     $('#reasonOverlay').classList.remove('show');
-    pendingGiftId = null;
+    choice = null;
   }
-  function chooseReason(reason){
-    if(pendingGiftId) addGift(pendingGiftId, reason);
-    closeReason();
+  function confirmChoice(){
+    if(!choice || !choice.value) return;
+    if(choice.onOk(choice.value, choice.qty) !== false) closeReason();
+  }
+
+  // 周邊頁的贈送卡：滿額贈品／扭蛋贈品／業務贈送
+  function openGiftSet(reason){
+    const options = GIFT_SETS[reason].map(id => {
+      if(id === 'beans1kg') return { value:'beans1kg', label:'生豆1KG',
+        sub: products.filter(p => p.cat === '1kg' && p.unit !== '杯').map(p => stockOption(p.id)) };
+      if(ANY_ITEMS[id]) return { value:id, label:ANY_ITEMS[id] };
+      return stockOption(id);
+    });
+    openChoice({ title:reason, sub:'選擇品項與數量（不收費）', options,
+      onOk: (id, qty) => addGiftLine(id, reason, qty) });
+  }
+
+  // 品飲杯：選顏色＋數量（販售）
+  function openGroupPick(group){
+    const items = products.filter(p => p.group === group);
+    openChoice({ title:items[0].name.split('-')[0], sub:'選擇顏色與數量',
+      options: items.map(p => stockOption(p.id, p.name.split('-').pop())),
+      onOk: (id, qty) => {
+        const p = products.find(x => x.id === id);
+        if(availableStock(p) < qty){ showToast(`${p.name} 只剩 ${availableStock(p)} 個`, 'warn'); return false; }
+        if(cart[id]) cart[id].qty += qty; else cart[id] = { id, qty, reason:'銷售' };
+        refresh();
+      } });
+  }
+
+  // 加一行贈送（$0）。不綁色的只記數量；其他扣該商品庫存
+  function addGiftLine(id, reason, qty){
+    const key = id + '|' + reason;
+    if(ANY_ITEMS[id]){
+      if(cart[key]) cart[key].qty += qty;
+      else cart[key] = { id, qty, reason, custom:true, gift:true, name:ANY_ITEMS[id], price:0 };
+      refresh();
+      return true;
+    }
+    const p = products.find(x => x.id === id);
+    if(!p) return false;
+    if(availableStock(p) < qty){ showToast(`${p.name} 只剩 ${availableStock(p)} 個`, 'warn'); return false; }
+    if(cart[key]) cart[key].qty += qty;
+    else cart[key] = { id, qty, reason };
+    refresh();
+    return true;
   }
 
   /* ============================================================
@@ -722,6 +938,13 @@
           <span>${info.name} <span class="m-qty">$${info.price} × ${line.qty}</span></span>
           <span>$${sub}</span>`;
       }
+      linesEl.appendChild(row);
+    });
+
+    autoDiscounts().forEach(d => {
+      const row = document.createElement('div');
+      row.className = 'modal-line';
+      row.innerHTML = `<span>${d.name} <span class="m-qty">× ${d.qty}</span></span><span>−$${d.amount}</span>`;
       linesEl.appendChild(row);
     });
 
@@ -819,6 +1042,7 @@
     const now = new Date();
     const orderNo = formatOrderNo(now);
     const total = cartTotalAmount();
+    const bundles = autoDiscounts();   // 先算好，下面清空購物車前要用
 
     // 訂單層的付款方式、發票、折扣（純贈品 $0 訂單不帶）
     let payment = '', invoice = '', discount = 0;
@@ -851,6 +1075,14 @@
         invoice: isG ? '' : invoice     // 贈品不帶發票
       });
     });
+
+    // 組合價／加購價：每種折抵存一筆負金額（類別「組合優惠」），營收、付款總額自動扣掉
+    bundles.forEach(d => sales.push({
+      time: now.toLocaleString('zh-TW', { hour12:false }),
+      orderNo, id: 'bundle', name: d.name, qty: d.qty,
+      price: -d.amount / d.qty, subtotal: -d.amount,
+      category: '組合優惠', payment, invoice: '',
+    }));
 
     // 折扣：另存成一筆「負金額」紀錄，跟著這張單。
     // 這樣營收、付款總額、CSV 都會自動扣掉，不用另外處理。
@@ -1346,7 +1578,7 @@
   function updateStats(){
     const orderNos = new Set(sales.map(s => s.orderNo));
     // 贈品件數：排除「銷售 / 預購 / 折扣」，剩下的才是真正發放的贈品
-    const NON_GIFT_CATS = ['銷售', '預購', '折扣', '訂購單', '訂購單扣庫存'];
+    const NON_GIFT_CATS = ['銷售', '預購', '折扣', '組合優惠', '訂購單', '訂購單扣庫存'];
     const giftQty = sales.reduce((sum, s) => sum + (NON_GIFT_CATS.includes(s.category) ? 0 : Number(s.qty)), 0);
     const revenue = sales.reduce((sum, s) => sum + Number(s.subtotal), 0);
     $('#toolbarStats').textContent =
@@ -1383,7 +1615,8 @@
       if(t.dataset.add) addBean(t.dataset.add);
       else if(t.dataset.preorder) addPreorder();
       else if(t.dataset.stockedit) openStockEdit();
-      else if(t.dataset.give) openReason(t.dataset.give);
+      else if(t.dataset.giftset) openGiftSet(t.dataset.giftset);
+      else if(t.dataset.pickgroup) openGroupPick(t.dataset.pickgroup);
       else if(t.dataset.inc) changeQty(t.dataset.inc, 1);
       else if(t.dataset.dec) changeQty(t.dataset.dec, -1);
     });
@@ -1428,9 +1661,22 @@
 
     // 贈品原因彈窗
     $('#reasonOptions').addEventListener('click', e => {
-      const btn = e.target.closest('[data-reason]');
-      if(btn) chooseReason(btn.dataset.reason);
+      const btn = e.target.closest('[data-top]');
+      if(!btn || !choice) return;
+      choice.top = btn.dataset.top;
+      const t = choice.options.find(o => o.value === choice.top);
+      choice.value = t.sub ? null : choice.top;   // 有第二層（生豆1KG）要再選一次
+      paintChoice();
     });
+    $('#choiceSub').addEventListener('click', e => {
+      const btn = e.target.closest('[data-subv]');
+      if(!btn || !choice) return;
+      choice.value = btn.dataset.subv;
+      paintChoice();
+    });
+    $('#choiceDec').addEventListener('click', () => { if(choice && choice.qty > 1){ choice.qty--; paintChoice(); } });
+    $('#choiceInc').addEventListener('click', () => { if(choice){ choice.qty++; paintChoice(); } });
+    $('#choiceOk').addEventListener('click', confirmChoice);
     $('#reasonCancel').addEventListener('click', closeReason);
     $('#reasonOverlay').addEventListener('click', e => {
       if(e.target.id === 'reasonOverlay') closeReason();
