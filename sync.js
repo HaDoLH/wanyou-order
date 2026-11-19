@@ -151,6 +151,8 @@ const Sync = (() => {
     },
     /** 櫃台：刪除還沒付款的單（只是從清單移除，雲端留紀錄；已付款要走作廢） */
     remove: (no) => change(no, null, ['pending', 'returned', 'cancelled'], { status: 'deleted', deletedAt: Date.now() }),
+    /** 櫃台：把刪掉的單救回來（回到待付款；水果特調會重新佔用，庫存不夠會擋下） */
+    restore: (no) => change(no, null, ['deleted'], { status: 'pending', restoredAt: Date.now() }),
   };
 })();
 

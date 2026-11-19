@@ -42,7 +42,7 @@ function paintExpoCount() {
 
 function renderExpoList() {
   const q = $('#expoSearch').value.trim();
-  const inTab = o => expoTab === 'other' ? !['pending', 'paid', 'deleted'].includes(o.status) : o.status === expoTab;
+  const inTab = o => expoTab === 'other' ? !['pending', 'paid', 'deleted'].includes(o.status) : o.status === expoTab;  // deleted 分頁 = 已刪除的單
   const list = expoOrders
     .filter(o => inTab(o) && (!q || [o.no, o.name, o.phone].some(v => String(v).includes(q))))
     .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -64,6 +64,7 @@ function renderExpoList() {
           ${o.status === 'pending' ? `<button class="btn-sm danger-text" data-exporeturn="${expoEsc(o.no)}">退回業務</button>` : ''}
           ${o.status === 'pending' ? `<button class="btn-sm" data-expopay="${expoEsc(o.no)}">結帳</button>` : ''}
           ${o.status === 'paid' ? `<button class="btn-sm danger-text" data-expovoid="${expoEsc(o.no)}">作廢</button>` : ''}
+          ${o.status === 'deleted' ? `<button class="btn-sm" data-exporestore="${expoEsc(o.no)}">復原</button>` : ''}
         </div>
       </div>
     </div>`).join('');
@@ -174,6 +175,21 @@ async function voidExpoOrder(no) {
   }
 }
 
+/** 復原刪掉的單：回到待付款，業務和櫃台清單都會重新出現 */
+async function restoreExpoOrder(no) {
+  const rec = expoOrders.find(o => o.no === no);
+  if (!rec) return;
+  if (!confirm(`復原 ${no}（${rec.name}，$${Number(rec.total).toLocaleString()}）？
+會回到「待結帳」，有水果特調會重新佔用庫存。`)) return;
+  try {
+    await Sync.restore(no);
+    showToast('已復原，回到待結帳', 'success');
+  } catch (e) {
+    console.error(e);
+    showToast(syncErrorText(e), 'warn');
+  }
+}
+
 /** 刪除還沒付款的單：清單不再顯示，雲端留紀錄（按錯還救得回來） */
 async function deleteExpoOrder(no) {
   const rec = expoOrders.find(o => o.no === no);
@@ -219,6 +235,8 @@ function initExpo() {
     const voidBtn = e.target.closest('[data-expovoid]');
     const del = e.target.closest('[data-expodel]');
     const back = e.target.closest('[data-exporeturn]');
+    const restore = e.target.closest('[data-exporestore]');
+    if (restore) restoreExpoOrder(restore.dataset.exporestore);
     if (back) returnExpoOrder(back.dataset.exporeturn);
     if (pay) openExpoCheckout(pay.dataset.expopay);
     if (voidBtn) voidExpoOrder(voidBtn.dataset.expovoid);
